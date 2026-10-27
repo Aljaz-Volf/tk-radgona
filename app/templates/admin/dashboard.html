@@ -1,0 +1,7 @@
+{% extends "admin/base.html" %}{% block admin_title %}Nadzorna plošča{% endblock %}
+{% block admin_content %}
+<div class="admin-heading"><div><div class="kicker">Administracija</div><h1>Nadzorna plošča</h1><p>Dejansko stanje vsebin in klubskih dejavnosti.</p></div><a class="button" href="{{ url_for('admin.news_create') }}">Nova novica</a></div>
+<div class="stat-grid">{% for key, label in [('members','Aktivni člani'),('players','Aktivni igralci'),('played_matches','Odigrane tekme'),('upcoming_matches','Prihajajoče tekme'),('courts','Aktivna igrišča'),('articles','Objavljeni članki')] %}<div class="card stat-card"><strong>{{ stats[key] }}</strong><span>{{ label }}</span></div>{% endfor %}</div>
+<div class="admin-section"><div class="card"><div class="panel-heading"><h3>Nedavna dejavnost</h3></div>{% if activity %}<div class="table-wrap"><table><thead><tr><th>Čas</th><th>Dejanje</th><th>Vrsta</th><th>Uporabnik</th></tr></thead><tbody>{% for item in activity %}<tr><td>{{ item.created_at.strftime('%d. %m. %Y · %H:%M') }}</td><td>{{ item.action }}</td><td>{{ item.entity_type }} #{{ item.entity_id or '—' }}</td><td>{{ item.actor.username if item.actor else 'sistem' }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state">Dejavnosti še ni.</div>{% endif %}</div></div>
+{% endblock %}
+

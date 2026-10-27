@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Članarina in igralnina | TK Gornja Radgona{% endblock %}
+{% block description %}Članarina, igralnina in podatki za plačilo Teniškega kluba Gornja Radgona.{% endblock %}
+{% block content %}
+<header class="page-header"><div class="wrap"><div class="kicker">Članstvo</div><h1>Članarina in igralnina</h1><p>Veljavne cene ter podatki za plačilo članarine in uporabe igrišč.</p></div></header>
+<section class="section"><div class="wrap">
+  <div class="fee-grid">
+    <article class="card fee-card"><div class="kicker">Članarina</div><h2>25,00 €</h2><p>Letna članarina</p></article>
+    <article class="card fee-card"><div class="kicker">Igralnina · 1 ura</div><div class="price-row"><span>Člani</span><strong>3,00 €</strong></div><div class="price-row"><span>Nečlani</span><strong>6,00 €</strong></div><div class="price-row"><span>Reflektorji · samo nečlani</span><strong>+ 1,00 €</strong></div></article>
+  </div>
+
+  <div class="payment-layout">
+    <article class="card payment-card">
+      <div class="kicker">Plačilo preko e-banke</div><h2>Podatki za nakazilo</h2>
+      <dl class="payment-details">
+        <div><dt>TRR</dt><dd><strong>SI56 1010 0005 3102 451</strong></dd></div>
+        <div><dt>SWIFT</dt><dd>BAKOSI2X</dd></div>
+        <div><dt>Sklic</dt><dd>99</dd></div>
+        <div><dt>Namen plačila</dt><dd>PLAČILO ČLANARINE ali PLAČILO IGRALNINE</dd></div>
+      </dl>
+    </article>
+    <aside class="card club-address"><div class="kicker">Prejemnik</div><h3>Teniški klub Gornja Radgona</h3><address>Partizanska cesta 29<br>9250 Gornja Radgona</address></aside>
+  </div>
+
+  <div class="payment-notice" role="note"><strong>Prosimo, pri nakazilu navedite, kaj plačujete:</strong><span>članarino ali igralnino.</span></div>
+
+  {% if section and section.body_html %}<article class="card panel article-body admin-section">{{ section.body_html|safe }}</article>{% endif %}
+</div></section>
+{% endblock %}
+

@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}{{ gallery.title }} | Galerije{% endblock %}
+{% block content %}
+<header class="page-header"><div class="wrap"><div class="breadcrumbs"><a href="{{ url_for('public.gallery_index') }}">Galerija</a> / {{ gallery.title }}</div><h1>{{ gallery.title }}</h1>{% if gallery.description %}<p>{{ gallery.description }}</p>{% endif %}</div></header>
+<section class="section"><div class="wrap">{% if gallery.images %}<div class="photo-grid">{% for item in gallery.images %}<a href="{{ url_for('public.media', key=item.storage_key) }}" data-lightbox-item data-caption="{{ item.caption or gallery.title }}"><img src="{{ url_for('public.media', key=item.storage_key) }}" alt="{{ item.caption or '' }}" loading="lazy" width="{{ item.width or 800 }}" height="{{ item.height or 600 }}"></a>{% endfor %}</div>{% else %}<div class="empty-state"><strong>Album je še prazen.</strong>Fotografije bodo dodane kmalu.</div>{% endif %}</div></section>
+<dialog class="lightbox" data-lightbox><figure><img src="" alt=""><figcaption></figcaption></figure><div class="lightbox-controls"><button type="button" data-prev>← Prejšnja</button><button type="button" data-close>Zapri</button><button type="button" data-next>Naslednja →</button></div></dialog>
+{% endblock %}
+

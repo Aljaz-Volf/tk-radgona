@@ -1,0 +1,4 @@
+{% extends "admin/base.html" %}{% from "macros/forms.html" import render_form %}
+{% block admin_title %}{{ 'Uredi organ' if committee else 'Nov organ' }}{% endblock %}
+{% block admin_content %}<div class="admin-heading"><div><h1>{{ 'Uredi organ' if committee else 'Nov organ kluba' }}</h1><p>Naziv in vrstni red prikaza na javni strani.</p></div><a class="button button-secondary" href="{{ url_for('admin.committees') }}">Nazaj</a></div><div class="card panel">{{ render_form(form) }}</div>{% endblock %}
+

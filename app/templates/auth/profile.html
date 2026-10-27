@@ -1,0 +1,4 @@
+{% extends "base.html" %}
+{% block title %}Moj račun | TK Gornja Radgona{% endblock %}
+{% block content %}<header class="page-header"><div class="narrow"><div class="kicker">Članski račun</div><h1>{{ current_user.username }}</h1><p>{{ current_user.email }}</p></div></header><section class="section"><div class="narrow"><div class="card panel"><h3>Profil</h3>{% if current_user.member %}<p><strong>{{ current_user.member.full_name }}</strong><br>Članska številka: {{ current_user.member.membership_number or 'ni vpisana' }}</p>{% else %}<div class="empty-state">Vaš uporabniški račun še ni povezan s člansko evidenco. Obrnite se na administratorja.</div>{% endif %}<a class="button admin-section" href="{{ url_for('reservations.calendar') }}">Moje rezervacije</a></div></div></section>{% endblock %}
+

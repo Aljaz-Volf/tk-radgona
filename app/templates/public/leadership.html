@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Organi kluba | TK Gornja Radgona{% endblock %}
+{% block description %}Upravni odbor, nadzorni odbor in komisije Teniškega kluba Gornja Radgona.{% endblock %}
+{% block content %}
+<header class="page-header"><div class="wrap"><div class="kicker">Teniški klub Gornja Radgona</div><h1>Organi kluba</h1><p>Vodstvo, odbori in komisije kluba.</p></div></header>
+<section class="section"><div class="wrap">
+  {% if committees %}
+    <div class="committee-grid">{% for committee in committees %}<article class="card committee-card"><div class="kicker">Organ kluba</div><h2>{{ committee.name }}</h2>{% if committee.members %}<ul class="committee-list">{% for member in committee.members %}<li><strong>{{ member.name }}</strong><span>{{ member.position }}</span></li>{% endfor %}</ul>{% else %}<div class="empty-state">Člani še niso vpisani.</div>{% endif %}</article>{% endfor %}</div>
+  {% else %}
+    <div class="empty-state"><strong>Podatki o organih kluba še niso objavljeni.</strong>Potrjena sestava bo prikazana tukaj.</div>
+  {% endif %}
+</div></section>
+{% endblock %}
+

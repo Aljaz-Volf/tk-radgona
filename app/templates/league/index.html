@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Liga Radgona | TK Gornja Radgona{% endblock %}
+{% block content %}
+<header class="page-header"><div class="wrap"><div class="kicker">Tekmovanje</div><h1>Liga Radgona</h1><p>Aktualne lestvice, rezultati in razpored tekem.</p></div></header>
+<section class="section"><div class="wrap">
+  {% if season %}
+    <div class="card panel"><div class="panel-heading"><div><div class="kicker">Aktualna sezona</div><h3>{{ season.name }}</h3></div><a class="button" href="{{ url_for('league.season', slug=season.slug) }}">Odpri sezono</a></div>{% if season.rules %}<p>{{ season.rules|striptags|truncate(240) }}</p>{% endif %}</div>
+  {% else %}
+    <div class="empty-state"><strong>Aktualna sezona še ni objavljena.</strong>Uradni podatki bodo prikazani, ko jih potrdi klub.</div>
+  {% endif %}
+  <div class="archive-prompt card"><div><div class="kicker">Pretekle sezone</div><h3>Iščete stare rezultate?</h3><p>Zaključene sezone, lestvice in rezultati so zbrani v ločenem arhivu lige.</p></div><a class="button button-secondary" href="{{ url_for('league.archive') }}">Odpri arhiv lige →</a></div>
+</div></section>
+{% endblock %}
+

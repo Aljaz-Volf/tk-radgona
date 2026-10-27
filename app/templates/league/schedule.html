@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Razpored tekem | Liga Radgona{% endblock %}
+{% block content %}
+<header class="page-header"><div class="wrap"><div class="kicker">Liga Radgona</div><h1>Razpored tekem</h1><p>Prihajajoče tekme aktualne sezone.</p></div></header>
+<section class="section"><div class="wrap">{% include "league/_nav.html" %}
+  {% if matches %}<div class="table-wrap"><table><thead><tr><th>Termin</th><th>Skupina</th><th>Igralec 1</th><th>Igralec 2</th></tr></thead><tbody>{% for match in matches %}<tr><td>{{ match.scheduled_at.strftime('%d. %m. %Y · %H:%M') if match.scheduled_at else 'Termin še ni določen' }}</td><td>{{ match.group.name }}</td><td>{{ match.player1.display_name }}</td><td>{{ match.player2.display_name }}</td></tr>{% endfor %}</tbody></table></div>
+  {% elif season %}<div class="empty-state"><strong>Ni napovedanih tekem.</strong>Razpored bo prikazan po objavi terminov.</div>
+  {% else %}<div class="empty-state"><strong>Aktualna sezona še ni objavljena.</strong>Razpored bo na voljo po objavi sezone.</div>{% endif %}
+</div></section>
+{% endblock %}
+

@@ -1,0 +1,2 @@
+{% extends "admin/base.html" %}{% from "macros/forms.html" import render_form %}{% block admin_title %}Dostop{% endblock %}{% block admin_content %}<div class="admin-heading"><div><h1>Dostop uporabnika</h1><p>{{ user.username }} · {{ user.email }}</p></div><a class="button button-secondary" href="{{ url_for('admin.users') }}">Nazaj</a></div><div class="card panel">{{ render_form(form) }}</div>{% endblock %}
+

@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Galerija | TK Gornja Radgona{% endblock %}
+{% block content %}
+<header class="page-header"><div class="wrap"><div class="kicker">Klubski utrinki</div><h1>Galerija</h1><p>Fotografije s tekem, turnirjev in druženj.</p></div></header>
+<section class="section"><div class="wrap">{% if galleries %}<div class="gallery-grid">{% for gallery in galleries %}<a class="gallery-card" href="{{ url_for('public.gallery_detail', slug=gallery.slug) }}">{% if gallery.cover_image %}<img src="{{ url_for('public.media', key=gallery.cover_image.storage_key) }}" alt="">{% endif %}<span>{{ gallery.title }}</span></a>{% endfor %}</div>{% else %}<div class="empty-state"><strong>Galerije še niso objavljene.</strong>Prvi album bo prikazan tukaj.</div>{% endif %}</div></section>
+{% endblock %}
+

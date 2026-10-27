@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Razvrstitve | Liga Radgona{% endblock %}
+{% block content %}
+<header class="page-header"><div class="wrap"><div class="kicker">Liga Radgona</div><h1>Razvrstitve</h1><p>Lestvice skupin aktualne sezone.</p></div></header>
+<section class="section"><div class="wrap">{% include "league/_nav.html" %}
+  {% if group_tables %}{% for group, rows in group_tables %}<div class="section-heading {% if not loop.first %}admin-section{% endif %}"><div><div class="kicker">{{ season.name }}</div><h2>{{ group.name }}</h2></div></div>{% if rows %}<div class="table-wrap"><table><thead><tr><th>#</th><th>Igralec</th><th>Odigrano</th><th>Z</th><th>P</th><th>Nizi</th><th>Igre</th><th>Točke</th></tr></thead><tbody>{% for row in rows %}<tr><td class="rank">{{ loop.index }}</td><td><a class="table-link" href="{{ url_for('league.player', slug=row.player.slug) }}">{{ row.player.display_name }}</a></td><td>{{ row.played }}</td><td>{{ row.wins }}</td><td>{{ row.losses }}</td><td>{{ row.sets_won }}:{{ row.sets_lost }}</td><td>{{ row.games_won }}:{{ row.games_lost }}</td><td><strong>{{ row.points }}</strong></td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state">Lestvica še nima rezultatov.</div>{% endif %}{% endfor %}
+  {% elif season %}<div class="empty-state"><strong>Skupine še niso objavljene.</strong>Razvrstitve bodo prikazane po vnosu skupin.</div>
+  {% else %}<div class="empty-state"><strong>Aktualna sezona še ni objavljena.</strong>Razvrstitve bodo na voljo po objavi sezone.</div>{% endif %}
+</div></section>
+{% endblock %}
+

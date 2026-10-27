@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Statut kluba | TK Gornja Radgona{% endblock %}
+{% block content %}
+<header class="page-header"><div class="narrow"><div class="kicker">Dokumenti kluba</div><h1>Statut kluba</h1><p>Temeljni akt Teniškega kluba Gornja Radgona.</p></div></header>
+<section class="section"><div class="narrow">
+  {% if statute_available %}
+    <div class="card document-card"><span class="document-icon" aria-hidden="true">PDF</span><div><h2>Statut TK Gornja Radgona</h2><p>Dokument se odpre v novem zavihku.</p></div><a class="button" href="{{ url_for('static', filename='documents/statut-tk-gornja-radgona.pdf') }}" target="_blank" rel="noopener noreferrer">Odpri statut ↗</a></div>
+  {% else %}
+    <div class="empty-state"><strong>PDF statuta še ni naložen.</strong>Dokument bo na voljo takoj, ko ga klub objavi.</div>
+  {% endif %}
+  {% if section and section.body_html %}<article class="card panel article-body admin-section">{{ section.body_html|safe }}</article>{% endif %}
+</div></section>
+{% endblock %}
+

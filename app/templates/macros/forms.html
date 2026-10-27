@@ -1,0 +1,24 @@
+{% macro field(item, class_name='') %}
+  <div class="form-field {{ class_name }}{% if item.errors %} has-error{% endif %}">
+    {{ item.label }}
+    {% if item.description %}<small>{{ item.description }}</small>{% endif %}
+    {{ item(class_='input') }}
+    {% for error in item.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+  </div>
+{% endmacro %}
+
+{% macro checkbox(item) %}
+  <label class="check-field">{{ item() }}<span>{{ item.label.text }}</span></label>
+  {% for error in item.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+{% endmacro %}
+
+{% macro render_form(form, submit_label=None) %}
+  <form method="post" enctype="multipart/form-data" class="form-stack">
+    {{ form.hidden_tag() }}
+    {% for item in form if item.name not in ['csrf_token', 'submit'] %}
+      {% if item.type == 'BooleanField' %}{{ checkbox(item) }}{% else %}{{ field(item) }}{% endif %}
+    {% endfor %}
+    {{ form.submit(class_='button') }}
+  </form>
+{% endmacro %}
+

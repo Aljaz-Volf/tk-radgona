@@ -1,0 +1,1 @@
+{% extends "admin/base.html" %}{% from "macros/forms.html" import render_form %}{% block admin_title %}Nastavitve{% endblock %}{% block admin_content %}<div class="admin-heading"><div><h1>Nastavitve</h1><p>Osnovni kontaktni in iskalni podatki spletnega mesta.</p></div></div><div class="card panel">{{ render_form(form) }}</div>{% endblock %}

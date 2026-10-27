@@ -1,0 +1,2 @@
+{% extends "base.html" %}{% block title %}Datoteka je prevelika{% endblock %}{% block content %}<div class="auth-shell"><div class="card auth-card"><div class="kicker">Napaka 413</div><h1>Datoteka je prevelika</h1><p>Naložena datoteka presega dovoljeno velikost.</p><a class="button" href="{{ request.referrer or url_for('public.home') }}">Nazaj</a></div></div>{% endblock %}
+

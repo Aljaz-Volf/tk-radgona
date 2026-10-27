@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Igrišča in rezervacije | TK Gornja Radgona{% endblock %}
+{% block description %}Rezervacija igrišč Teniškega kluba Gornja Radgona preko aplikacije Courtiplay.{% endblock %}
+{% block content %}
+<header class="page-header courtiplay-header">
+  <div class="wrap">
+    <div class="kicker">Igrišča in rezervacije</div>
+    <h1>Rezervirajte s Courtiplay</h1>
+    <p>Z letošnjo sezono prehajamo na napreden rezervacijski sistem Courtiplay — za hitrejše, lažje in preglednejše upravljanje rezervacij preko mobilne aplikacije.</p>
+    <div class="hero-actions">
+      <a class="button" href="https://apps.apple.com/si/app/courtiplay/id6739180100" target="_blank" rel="noopener noreferrer">Aplikacija za iPhone ↗</a>
+      <a class="button button-secondary" href="https://play.google.com/store/apps/details?id=com.courtiplay.app" target="_blank" rel="noopener noreferrer">Aplikacija za Android ↗</a>
+    </div>
+  </div>
+</header>
+
+<section class="section">
+  <div class="wrap courtiplay-intro">
+    <div>
+      <div class="kicker">Nova izkušnja za člane</div>
+      <h2>Vse rezervacije na enem mestu</h2>
+      <p>Za menjavo smo se odločili, ker je Courtiplay izrazito uporabniku prijazen in prinaša funkcije, ki jih potrebujemo za sodobno upravljanje ter vaše udobje. Platforma vključuje zmogljivo mobilno aplikacijo, inovativne rešitve za iskanje soigralcev in odzivno podporo.</p>
+      <p>Rezervacije delujejo zelo podobno kot v sistemu Sportifiq, dodatne možnosti pa vam pomagajo do več igre in lažjega dogovarjanja.</p>
+    </div>
+    <aside class="card courtiplay-highlight">
+      <span class="courtiplay-mark" aria-hidden="true">C</span>
+      <strong>Skoraj 10.000 uporabnikov</strong>
+      <p>Courtiplay povezuje največjo padel skupnost in številne klube po vsej Sloveniji.</p>
+      <a class="text-link" href="{{ courtiplay_url }}" target="_blank" rel="noopener noreferrer">Odpri courtiplay.com ↗</a>
+    </aside>
+  </div>
+</section>
+
+<section class="section-soft">
+  <div class="wrap">
+    <div class="section-heading"><div><div class="kicker">Več kot rezervacija</div><h2>Zakaj Courtiplay?</h2><p>Funkcije, ki olajšajo pot do naslednje tekme.</p></div></div>
+    <div class="feature-grid">
+      <article class="card feature-card"><span class="icon-chip" aria-hidden="true">01</span><h3>Odprte tekme</h3><p>Preko odprtih rezervacij oziroma Open Matches preprosto poiščete soigralce. Tako je več priložnosti za igro za vse.</p></article>
+      <article class="card feature-card"><span class="icon-chip" aria-hidden="true">02</span><h3>Osebni ranking</h3><p>Rangirane tekme vplivajo na vaš Courtiplay ranking za padel in tenis. Dinamična ocena pomaga poiskati uravnoteženo igro.</p></article>
+      <article class="card feature-card"><span class="icon-chip" aria-hidden="true">03</span><h3>Vgrajen klepet</h3><p>S soigralci se dogovorite neposredno v aplikaciji, brez iskanja in izmenjave kontaktnih podatkov.</p></article>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+    <div class="section-heading"><div><div class="kicker">Manj kot minuta</div><h2>Kako začeti</h2><p>Za dostop do klubskih rezervacij opravite tri kratke korake.</p></div></div>
+    <ol class="step-list">
+      <li class="card step-card">
+        <span class="step-number">1</span>
+        <div><h3>Naložite aplikacijo</h3><p>Za najboljšo izkušnjo priporočamo mobilno aplikacijo.</p><div class="store-actions"><a class="button button-small" href="https://apps.apple.com/si/app/courtiplay/id6739180100" target="_blank" rel="noopener noreferrer">iPhone ↗</a><a class="button button-secondary button-small" href="https://play.google.com/store/apps/details?id=com.courtiplay.app" target="_blank" rel="noopener noreferrer">Android ↗</a></div></div>
+      </li>
+      <li class="card step-card">
+        <span class="step-number">2</span>
+        <div><h3>Registrirajte se</h3><p>Uporabite isti e-poštni naslov kot v starem sistemu Sportifiq. Med registracijo izberite svoj klub in nastavite začetni ranking.</p><p class="step-note"><strong>Prenos dobroimetja:</strong> morebitni krediti ali paketi bodo po plačilu članarine za tekoče leto samodejno preneseni na vaš Courtiplay profil. Če želite drug e-naslov ali opazite neskladje, nas obvestite.</p></div>
+      </li>
+      <li class="card step-card">
+        <span class="step-number">3</span>
+        <div><h3>Dodajte klub med priljubljene</h3><p>Poiščite TK Gornja Radgona in kliknite ikono srčka. Klub bo nato vedno hitro dostopen na vašem profilu.</p></div>
+      </li>
+    </ol>
+    <div class="web-access card"><div><strong>Raje uporabljate računalnik?</strong><p>Do Courtiplaya lahko dostopate tudi preko spletnega brskalnika.</p></div><a class="button" href="{{ courtiplay_url }}" target="_blank" rel="noopener noreferrer">Odpri Courtiplay ↗</a></div>
+  </div>
+</section>
+
+<section class="cta courtiplay-support">
+  <div class="wrap cta-inner">
+    <div><h2>Potrebujete pomoč?</h2><p>Za vprašanja ali pomoč pri registraciji se obrnite na podporo Courtiplay.</p></div>
+    <div class="support-links">
+      <a href="tel:+38651321738"><strong>Valentina Metež</strong><span>051 321 738</span></a>
+      <a href="tel:+38651374654"><strong>Boris Senger</strong><span>051 374 654</span></a>
+      <a href="mailto:info@courtiplay.com"><strong>E-pošta</strong><span>info@courtiplay.com</span></a>
+    </div>
+  </div>
+</section>
+{% endblock %}
+

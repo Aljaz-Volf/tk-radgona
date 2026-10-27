@@ -1,0 +1,2 @@
+{% extends "admin/base.html" %}{% from "macros/forms.html" import render_form %}{% block admin_title %}Rezultat{% endblock %}{% block admin_content %}<div class="admin-heading"><div><h1>Vpis rezultata</h1><p>{{ match.player1.display_name }} — {{ match.player2.display_name }}</p></div><a class="button button-secondary" href="{{ url_for('admin.matches') }}">Nazaj</a></div><div class="card panel"><p>Vnesite zaključene nize, ločene z vejico. Podprt je tudi odločilni podaljšani niz, npr. <strong>6-4, 3-6, 10-8</strong>.</p>{{ render_form(form) }}</div>{% endblock %}
+

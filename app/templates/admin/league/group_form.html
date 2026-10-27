@@ -1,0 +1,2 @@
+{% extends "admin/base.html" %}{% from "macros/forms.html" import render_form %}{% block admin_title %}Skupina{% endblock %}{% block admin_content %}<div class="admin-heading"><div><h1>{{ 'Uredi skupino' if group else 'Nova skupina' }}</h1><p>{{ season.name }}</p></div><a class="button button-secondary" href="{{ url_for('admin.seasons') }}">Nazaj</a></div><div class="card panel">{{ render_form(form) }}</div>{% endblock %}
+

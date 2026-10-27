@@ -1,0 +1,3 @@
+{% extends "admin/base.html" %}{% from "macros/forms.html" import render_form %}{% block admin_title %}{{ 'Uredi članek' if article else 'Nov članek' }}{% endblock %}
+{% block admin_content %}<div class="admin-heading"><div><h1>{{ 'Uredi članek' if article else 'Nov članek' }}</h1><p>Vsebina se pred shranjevanjem varno očisti.</p></div><a class="button button-secondary" href="{{ url_for('admin.news') }}">Nazaj</a></div><div class="card panel">{{ render_form(form) }}</div>{% endblock %}
+

@@ -1,0 +1,4 @@
+{% extends "base.html" %}{% from "macros/forms.html" import render_form %}
+{% block title %}Nova rezervacija | TK Gornja Radgona{% endblock %}
+{% block content %}<header class="page-header"><div class="narrow"><div class="breadcrumbs"><a href="{{ url_for('reservations.calendar') }}">Rezervacije</a> / Nova</div><h1>Rezerviraj igrišče</h1><p>Izberite igrišče in termin znotraj odpiralnega časa.</p></div></header><section class="section"><div class="narrow card auth-card">{{ render_form(form) }}</div></section>{% endblock %}
+

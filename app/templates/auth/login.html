@@ -1,0 +1,4 @@
+{% extends "base.html" %}{% from "macros/forms.html" import field, checkbox %}
+{% block title %}Prijava | TK Gornja Radgona{% endblock %}
+{% block content %}<div class="auth-shell"><div class="card auth-card"><div class="kicker">Članski račun</div><h1>Dobrodošli nazaj</h1><p>Prijavite se za rezervacije in dostop do članskih vsebin.</p><form method="post" class="form-stack">{{ form.hidden_tag() }}{{ field(form.identity) }}{{ field(form.password) }}{{ checkbox(form.remember) }}{{ form.submit(class_='button') }}</form><p class="admin-section"><a class="text-link" href="{{ url_for('auth.forgot_password') }}">Ste pozabili geslo?</a></p></div></div>{% endblock %}
+

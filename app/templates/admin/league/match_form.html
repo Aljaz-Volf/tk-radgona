@@ -1,0 +1,2 @@
+{% extends "admin/base.html" %}{% from "macros/forms.html" import render_form %}{% block admin_title %}Tekma{% endblock %}{% block admin_content %}<div class="admin-heading"><div><h1>{{ 'Uredi tekmo' if match else 'Nova tekma' }}</h1></div><a class="button button-secondary" href="{{ url_for('admin.matches') }}">Nazaj</a></div><div class="card panel">{{ render_form(form) }}</div>{% endblock %}
+
