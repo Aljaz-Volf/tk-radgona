@@ -46,6 +46,7 @@ class Config:
     MAIL_PASSWORD = os.getenv("MAIL_PASSWORD")
     MAIL_DEFAULT_SENDER = os.getenv("MAIL_DEFAULT_SENDER")
     COURTIPLAY_URL = os.getenv("COURTIPLAY_URL", "https://courtiplay.com")
+    APP_TIMEZONE = os.getenv("APP_TIMEZONE", "Europe/Ljubljana")
 
 
 class TestConfig(Config):

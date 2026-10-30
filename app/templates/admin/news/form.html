@@ -1,3 +1,75 @@
-{% extends "admin/base.html" %}{% from "macros/forms.html" import render_form %}{% block admin_title %}{{ 'Uredi članek' if article else 'Nov članek' }}{% endblock %}
-{% block admin_content %}<div class="admin-heading"><div><h1>{{ 'Uredi članek' if article else 'Nov članek' }}</h1><p>Vsebina se pred shranjevanjem varno očisti.</p></div><a class="button button-secondary" href="{{ url_for('admin.news') }}">Nazaj</a></div><div class="card panel">{{ render_form(form) }}</div>{% endblock %}
+{% extends "admin/base.html" %}
+{% from "macros/forms.html" import field %}
+{% block admin_title %}{{ 'Uredi članek' if article else 'Nov članek' }}{% endblock %}
+{% block admin_content %}
+<div class="admin-heading">
+  <div>
+    <h1>{{ 'Uredi članek' if article else 'Nov članek' }}</h1>
+    <p>Vsebina se pred shranjevanjem varno očisti.</p>
+  </div>
+  <a class="button button-secondary" href="{{ url_for('admin.news') }}">Nazaj</a>
+</div>
 
+<div class="card panel news-editor">
+  <form method="post" enctype="multipart/form-data" class="form-stack" data-news-editor>
+    {{ form.hidden_tag() }}
+    {{ field(form.title) }}
+    {{ field(form.summary) }}
+    {{ field(form.body) }}
+
+    <div data-news-images data-existing="{{ article.images|length if article else 0 }}">
+      {{ field(form.images) }}
+      <small class="news-image-count" data-news-image-count>
+        {{ article.images|length if article else 0 }} od 100 fotografij v članku
+      </small>
+    </div>
+
+    <div class="news-editor-meta">
+      <div class="form-field{% if form.status.errors %} has-error{% endif %}">
+        {{ form.status.label }}
+        <div class="news-status-control" data-news-status>
+          {{ form.status(class_='sr-only', tabindex='-1', aria_hidden='true') }}
+          <button class="news-status-trigger" type="button" data-status-trigger aria-haspopup="listbox" aria-expanded="false">
+            <span class="news-status-dot" aria-hidden="true"></span>
+            <span data-status-label>{{ 'Objavljeno' if form.status.data == 'published' else 'Osnutek' }}</span>
+            <span class="news-status-arrow" aria-hidden="true"></span>
+          </button>
+          <div class="news-status-menu" data-status-menu role="listbox" aria-label="Stanje članka">
+            <button type="button" role="option" data-status-value="draft" aria-selected="{{ 'true' if form.status.data != 'published' else 'false' }}">
+              <span class="news-status-option-dot is-draft" aria-hidden="true"></span><span><strong>Osnutek</strong><small>Članek še ni javno viden</small></span>
+            </button>
+            <button type="button" role="option" data-status-value="published" aria-selected="{{ 'true' if form.status.data == 'published' else 'false' }}">
+              <span class="news-status-option-dot is-published" aria-hidden="true"></span><span><strong>Objavljeno</strong><small>Članek je viden obiskovalcem</small></span>
+            </button>
+          </div>
+        </div>
+        {% for error in form.status.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+      </div>
+      <div class="form-field{% if form.published_at.errors %} has-error{% endif %}">
+        {{ form.published_at.label }}
+        {{ form.published_at(class_='input') }}
+        {% for error in form.published_at.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+      </div>
+    </div>
+
+    {{ form.submit(class_='button') }}
+  </form>
+</div>
+
+{% if article and article.images %}
+<div class="card panel admin-section">
+  <div class="panel-heading"><h3>Fotografije v članku</h3><span class="tag">{{ article.images|length }} / 100</span></div>
+  <div class="photo-grid news-admin-images">
+    {% for item in article.images %}
+      <div>
+        <img src="{{ url_for('public.media', key=item.storage_key) }}" alt="" loading="lazy" width="{{ item.width or 800 }}" height="{{ item.height or 600 }}">
+        <form method="post" action="{{ url_for('admin.news_image_delete', image_id=item.id) }}" data-confirm="Odstranim fotografijo iz članka?">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="button button-danger button-small" type="submit">Odstrani</button>
+        </form>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -116,7 +116,11 @@ class Season(TimestampMixin, db.Model):
     win_points = db.Column(db.Integer, nullable=False, default=2)
     loss_points = db.Column(db.Integer, nullable=False, default=0)
     rules = db.Column(db.Text)
-    __table_args__ = (CheckConstraint("ends_on >= starts_on", name="valid_dates"),)
+    __table_args__ = (
+        CheckConstraint("ends_on >= starts_on", name="valid_dates"),
+        CheckConstraint("win_points >= 0", name="nonnegative_win_points"),
+        CheckConstraint("loss_points >= 0", name="nonnegative_loss_points"),
+    )
 
 
 class LeagueGroup(TimestampMixin, db.Model):
@@ -258,6 +262,7 @@ class NewsArticle(TimestampMixin, db.Model):
     image_key = db.Column(db.String(500))
     status = db.Column(db.String(20), nullable=False, default="draft", index=True)
     published_at = db.Column(db.DateTime(timezone=True), index=True)
+    is_pinned = db.Column(db.Boolean, nullable=False, default=False, index=True)
     category = db.relationship("NewsCategory", backref="articles")
     author = db.relationship("User", backref="articles")
     __table_args__ = (CheckConstraint("status in ('draft','published')", name="valid_status"),)
@@ -266,8 +271,38 @@ class NewsArticle(TimestampMixin, db.Model):
     def is_public(self):
         if not self.published_at or self.status != "published":
             return False
-        comparison_time = datetime.now(self.published_at.tzinfo) if self.published_at.tzinfo else datetime.now()
-        return self.published_at <= comparison_time
+        published_at = self.published_at
+        if published_at.tzinfo:
+            published_at = published_at.astimezone(timezone.utc).replace(tzinfo=None)
+        comparison_time = datetime.now(timezone.utc).replace(tzinfo=None)
+        return published_at <= comparison_time
+
+    @property
+    def cover_image_key(self):
+        if self.image_key:
+            return self.image_key
+        return self.images[0].storage_key if self.images else None
+
+
+class NewsArticleImage(TimestampMixin, db.Model):
+    __tablename__ = "news_article_images"
+    id = db.Column(db.Integer, primary_key=True)
+    article_id = db.Column(
+        db.Integer,
+        db.ForeignKey("news_articles.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    storage_key = db.Column(db.String(500), nullable=False)
+    sort_order = db.Column(db.Integer, nullable=False, default=0)
+    width = db.Column(db.Integer)
+    height = db.Column(db.Integer)
+    article = db.relationship(
+        "NewsArticle",
+        backref=db.backref(
+            "images", cascade="all, delete-orphan", order_by="NewsArticleImage.sort_order"
+        ),
+    )
 
 
 class Gallery(TimestampMixin, db.Model):

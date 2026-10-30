@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Člani | TK Gornja Radgona{% endblock %}
+{% block content %}
+<header class="page-header"><div class="wrap">
+  <div class="kicker">Teniški klub Gornja Radgona</div>
+  <h1>Člani</h1>
+  <p>Aktivni člani Teniškega kluba Gornja Radgona.</p>
+</div></header>
+<section class="section"><div class="wrap">
+  {% if section and section.body_html %}<div class="article-body member-directory-intro">{{ section.body_html|safe }}</div>{% endif %}
+  {% if members %}
+    <div class="member-directory">
+      {% for member in members %}
+        <article class="card member-directory-card">
+          <span class="member-directory-number">{{ member.membership_number or 'Član' }}</span>
+          <h2>{{ member.full_name }}</h2>
+          {% if member.membership_valid_until %}<small>Članstvo velja do {{ member.membership_valid_until.strftime('%d. %m. %Y') }}</small>{% else %}<small>Aktiven član</small>{% endif %}
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state"><strong>Aktivnih članov še ni v evidenci.</strong>Seznam bo prikazan po vnosu članov.</div>
+  {% endif %}
+</div></section>
+{% endblock %}

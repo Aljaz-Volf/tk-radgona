@@ -4,7 +4,7 @@
 <header class="page-header"><div class="wrap"><div class="kicker">Tekmovanje</div><h1>Liga Radgona</h1><p>Aktualne lestvice, rezultati in razpored tekem.</p></div></header>
 <section class="section"><div class="wrap">
   {% if season %}
-    <div class="card panel"><div class="panel-heading"><div><div class="kicker">Aktualna sezona</div><h3>{{ season.name }}</h3></div><a class="button" href="{{ url_for('league.season', slug=season.slug) }}">Odpri sezono</a></div>{% if season.rules %}<p>{{ season.rules|striptags|truncate(240) }}</p>{% endif %}</div>
+    <div class="card panel"><div class="panel-heading"><div><div class="kicker">Aktualna sezona</div><h3>{{ season.name }}</h3></div><a class="button" href="{{ url_for('league.season', slug=season.slug) }}">Odpri sezono</a></div></div>
   {% else %}
     <div class="empty-state"><strong>Aktualna sezona še ni objavljena.</strong>Uradni podatki bodo prikazani, ko jih potrdi klub.</div>
   {% endif %}

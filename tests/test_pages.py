@@ -1,3 +1,5 @@
+from app.extensions import db
+from app.models import Member
 from tests.conftest import login
 
 
@@ -5,9 +7,11 @@ def test_homepage_renders_without_seed_data(client):
     response = client.get("/")
     assert response.status_code == 200
     text = response.get_data(as_text=True)
-    assert "Igrajmo tenis" in text
+    assert "Teniški klub" in text
+    assert "Rdeča zemlja, dobra družba" in text
     assert "Novice še niso objavljene" in text
     assert ">Galerija<" not in text
+    assert 'id="galerije"' not in text
 
 
 def test_health_endpoint(client):
@@ -34,10 +38,21 @@ def test_club_navigation_and_membership_fees_render(client):
     assert ">Člani<" not in homepage
 
 
-def test_statute_page_handles_missing_pdf_without_broken_link(client):
+def test_statute_page_embeds_official_pdf(client):
     response = client.get("/klub/statute")
     assert response.status_code == 200
-    assert "PDF statuta še ni naložen" in response.get_data(as_text=True)
+    text = response.get_data(as_text=True)
+    assert "Statut TK Gornja Radgona" in text
+    assert "/static/documents/statut-tk-gornja-radgona.pdf#view=FitH" in text
+    pdf = client.get("/static/documents/statut-tk-gornja-radgona.pdf")
+    assert pdf.status_code == 200
+    assert pdf.data.startswith(b"%PDF")
+
+
+def test_dropdown_script_closes_menus_outside_and_with_escape(client):
+    script = client.get("/static/js/main.js").get_data(as_text=True)
+    assert "!dropdown.contains(event.target)" in script
+    assert "event.key === 'Escape'" in script
 
 
 def test_unpublished_club_pages_have_honest_empty_state(client):
@@ -50,18 +65,23 @@ def test_unpublished_club_pages_have_honest_empty_state(client):
     assert "Podatki o organih kluba še niso objavljeni" in leadership.get_data(as_text=True)
 
 
-def test_members_and_gallery_require_login(client, member):
+def test_members_and_gallery_require_login(app, client, member):
+    with app.app_context():
+        db.session.add(Member(first_name="Maja", last_name="Novak", membership_number="TK-10", active=True))
+        db.session.commit()
     assert client.get("/klub/members").status_code == 302
     assert client.get("/galerije").status_code == 302
     login(client, "member")
     members = client.get("/klub/members")
     gallery = client.get("/galerije")
     assert members.status_code == 200
-    assert "Vsebina je v pripravi" in members.get_data(as_text=True)
+    assert "Maja Novak" in members.get_data(as_text=True)
+    assert "TK-10" in members.get_data(as_text=True)
     assert gallery.status_code == 200
     homepage = client.get("/").get_data(as_text=True)
     assert ">Člani<" in homepage
     assert ">Galerija<" in homepage
+    assert 'id="galerije"' not in homepage
     navigation = homepage.split('<nav id="site-nav"', 1)[1].split("</nav>", 1)[0]
     ordered_labels = (
         ">Domov<",
@@ -70,10 +90,12 @@ def test_members_and_gallery_require_login(client, member):
         "<summary>Liga Radgona</summary>",
         ">Novice<",
         ">Galerija<",
-        ">Arhiv<",
     )
     positions = [navigation.index(label) for label in ordered_labels]
     assert positions == sorted(positions)
+    liga_menu = navigation.split("<summary>Liga Radgona</summary>", 1)[1].split("</details>", 1)[0]
+    assert ">Pravilnik lige<" in liga_menu
+    assert ">Arhiv<" in liga_menu
 
 
 def test_unknown_page_has_custom_404(client):

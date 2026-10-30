@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from flask_wtf import FlaskForm
-from flask_wtf.file import FileAllowed, FileField, MultipleFileField
+from flask_wtf.file import FileAllowed, MultipleFileField
 from wtforms import (
     BooleanField,
     DateField,
@@ -15,7 +15,7 @@ from wtforms import (
     TextAreaField,
     TimeField,
 )
-from wtforms.validators import DataRequired, Email, EqualTo, Length, NumberRange, Optional, ValidationError
+from wtforms.validators import DataRequired, Email, EqualTo, InputRequired, Length, NumberRange, Optional, ValidationError
 
 
 IMAGE_TYPES = ["jpg", "jpeg", "png", "webp"]
@@ -41,18 +41,30 @@ class ResetPasswordForm(FlaskForm):
 
 class NewsForm(FlaskForm):
     title = StringField("Naslov", validators=[DataRequired(), Length(max=220)])
-    category_id = SelectField("Kategorija", coerce=int, validators=[Optional()])
     summary = TextAreaField("Povzetek", validators=[Optional(), Length(max=1000)])
     body = TextAreaField("Vsebina", validators=[DataRequired()])
-    image = FileField("Naslovna fotografija", validators=[FileAllowed(IMAGE_TYPES, "Dovoljene so slike JPG, PNG in WebP.")])
+    images = MultipleFileField(
+        "Fotografije",
+        validators=[FileAllowed(IMAGE_TYPES, "Dovoljene so slike JPG, PNG in WebP.")],
+        description="Dodate lahko največ 100 fotografij na članek.",
+        render_kw={
+            "accept": "image/jpeg,image/png,image/webp",
+            "multiple": True,
+            "data-max-files": 100,
+        },
+    )
     status = SelectField("Stanje", choices=[("draft", "Osnutek"), ("published", "Objavljeno")])
-    published_at = DateTimeLocalField("Datum objave", validators=[Optional()], format="%Y-%m-%dT%H:%M")
+    published_at = DateTimeLocalField(
+        "Datum objave",
+        validators=[Optional()],
+        format="%Y-%m-%dT%H:%M",
+    )
     submit = SubmitField("Shrani članek")
 
-
-class CategoryForm(FlaskForm):
-    name = StringField("Ime kategorije", validators=[DataRequired(), Length(max=80)])
-    submit = SubmitField("Dodaj kategorijo")
+    def validate_images(self, field):
+        uploads = [upload for upload in (field.data or []) if upload and upload.filename]
+        if len(uploads) > 100:
+            raise ValidationError("Na članek lahko dodate največ 100 fotografij.")
 
 
 class PlayerForm(FlaskForm):
@@ -76,11 +88,20 @@ class SeasonForm(FlaskForm):
     name = StringField("Naziv sezone", validators=[DataRequired(), Length(max=120)])
     starts_on = DateField("Začetek", validators=[DataRequired()])
     ends_on = DateField("Konec", validators=[DataRequired()])
-    win_points = IntegerField("Točke za zmago", validators=[DataRequired(), NumberRange(min=0, max=20)], default=2)
-    loss_points = IntegerField("Točke za poraz", validators=[DataRequired(), NumberRange(min=0, max=20)], default=0)
-    rules = TextAreaField("Pravila", validators=[Optional()])
-    is_current = BooleanField("Aktualna sezona")
-    is_published = BooleanField("Javno objavljena")
+    win_points = IntegerField(
+        "Točke za zmago",
+        validators=[InputRequired(), NumberRange(min=0, max=20)],
+        default=2,
+        render_kw={"min": 0, "max": 20, "step": 1},
+    )
+    loss_points = IntegerField(
+        "Točke za poraz",
+        validators=[InputRequired(), NumberRange(min=0, max=20)],
+        default=0,
+        render_kw={"min": 0, "max": 20, "step": 1},
+    )
+    is_current = BooleanField("Aktualna sezona", default=True)
+    is_published = BooleanField("Javno objavljena", default=True)
     submit = SubmitField("Shrani sezono")
 
     def validate_ends_on(self, field):
@@ -155,7 +176,11 @@ class GalleryForm(FlaskForm):
     title = StringField("Naslov albuma", validators=[DataRequired(), Length(max=180)])
     description = TextAreaField("Opis", validators=[Optional(), Length(max=3000)])
     is_published = BooleanField("Javno objavljen")
-    images = MultipleFileField("Fotografije", validators=[FileAllowed(IMAGE_TYPES, "Dovoljene so slike JPG, PNG in WebP.")])
+    images = MultipleFileField(
+        "Fotografije",
+        validators=[FileAllowed(IMAGE_TYPES, "Dovoljene so slike JPG, PNG in WebP.")],
+        render_kw={"accept": "image/jpeg,image/png,image/webp", "multiple": True},
+    )
     submit = SubmitField("Shrani album")
 
 

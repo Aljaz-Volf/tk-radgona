@@ -1,13 +1,12 @@
-from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
 from flask import Blueprint, abort, current_app, redirect, render_template, request, send_from_directory, url_for
 from flask_login import current_user, login_required
 
-from ..models import ClubCommittee, ClubContent, Gallery, GalleryImage, NewsArticle, Reservation, Season
-from ..services.standings import ordered_standings
+from ..models import ClubCommittee, ClubContent, Gallery, GalleryImage, Member, NewsArticle, Player, Reservation, Season
 from ..services.uploads import media_url
+from ..services.time import utc_now_naive
 
 
 bp = Blueprint("public", __name__)
@@ -15,14 +14,19 @@ bp = Blueprint("public", __name__)
 
 @bp.get("/")
 def home():
-    now = datetime.now(timezone.utc)
-    articles = NewsArticle.query.filter(
+    now = utc_now_naive()
+    public_articles = NewsArticle.query.filter(
         NewsArticle.status == "published", NewsArticle.published_at <= now
-    ).order_by(NewsArticle.published_at.desc()).limit(3).all()
+    )
+    article = public_articles.filter_by(is_pinned=True).order_by(
+        NewsArticle.published_at.desc()
+    ).first()
+    if article is None:
+        article = public_articles.order_by(NewsArticle.published_at.desc()).first()
+    articles = [article] if article else []
     season = Season.query.filter_by(is_current=True, is_published=True).first()
     upcoming = []
     recent = []
-    standings = []
     if season:
         upcoming = sorted(
             [match for match in season.matches if match.status == "scheduled" and match.scheduled_at],
@@ -33,29 +37,27 @@ def home():
             key=lambda match: match.played_at or match.updated_at,
             reverse=True,
         )[:4]
-        if season.groups:
-            standings = ordered_standings(season.groups[0])[:5]
-    galleries = (
-        Gallery.query.filter_by(is_published=True).order_by(Gallery.created_at.desc()).limit(4).all()
-        if current_user.is_authenticated
-        else []
-    )
     club_sections = {section.section_key: section for section in ClubContent.query.filter_by(is_published=True).all()}
+    homepage_stats = {
+        "active_players": Player.query.filter_by(active=True).count(),
+        "published_seasons": Season.query.filter_by(is_published=True).count(),
+        "completed_matches": len([match for match in season.matches if match.status == "completed"]) if season else 0,
+        "upcoming_matches": len([match for match in season.matches if match.status == "scheduled"]) if season else 0,
+    }
     return render_template(
         "public/home.html",
         articles=articles,
         season=season,
         upcoming=upcoming,
         recent=recent,
-        standings=standings,
-        galleries=galleries,
+        homepage_stats=homepage_stats,
         club_sections=club_sections,
     )
 
 
 @bp.get("/novice")
 def news_index():
-    now = datetime.now(timezone.utc)
+    now = utc_now_naive()
     articles = NewsArticle.query.filter(
         NewsArticle.status == "published", NewsArticle.published_at <= now
     ).order_by(NewsArticle.published_at.desc()).all()
@@ -98,6 +100,9 @@ def club_section(section_key):
     section = ClubContent.query.filter_by(section_key=section_key, is_published=True).first()
     if section_key == "members" and not current_user.is_authenticated:
         return redirect(url_for("auth.login", next=request.full_path))
+    if section_key == "members":
+        members = Member.query.filter_by(active=True).order_by(Member.last_name, Member.first_name).all()
+        return render_template("public/members.html", members=members, section=section)
     if section_key == "leadership":
         committees = ClubCommittee.query.order_by(ClubCommittee.sort_order, ClubCommittee.name).all()
         return render_template("public/leadership.html", committees=committees)

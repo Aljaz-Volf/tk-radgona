@@ -40,11 +40,11 @@
             <a href="{{ url_for('league.results') }}">Rezultati</a>
             <a href="{{ url_for('league.standings') }}">Razvrstitve</a>
             <a href="{{ url_for('league.schedule') }}">Razpored tekem</a>
+            <a href="{{ url_for('league.archive') }}">Arhiv</a>
           </div>
         </details>
         <a href="{{ url_for('public.news_index') }}">Novice</a>
         {% if current_user.is_authenticated %}<a href="{{ url_for('public.gallery_index') }}">Galerija</a>{% endif %}
-        <a href="{{ url_for('league.archive') }}">Arhiv</a>
         {% if current_user.is_authenticated %}
           {% if current_user.has_any_role('administrator') %}<a href="{{ url_for('admin.dashboard') }}">Administracija</a>{% endif %}
           <a href="{{ url_for('auth.profile') }}">Moj račun</a>
@@ -67,7 +67,7 @@
   <footer class="site-footer">
     <div class="wrap footer-grid">
       <div><a class="brand footer-brand" href="{{ url_for('public.home') }}"><span class="logo" aria-hidden="true"></span><span>TK Gornja Radgona</span></a><p>Tenis, skupnost in Liga Radgona.</p></div>
-      <div><strong>Raziščite</strong><a href="{{ url_for('league.results') }}">Liga Radgona</a><a href="{{ url_for('reservations.calendar') }}">Rezervacija</a><a href="{{ url_for('public.news_index') }}">Novice</a>{% if current_user.is_authenticated %}<a href="{{ url_for('public.gallery_index') }}">Galerija</a>{% endif %}<a href="{{ url_for('league.archive') }}">Arhiv</a></div>
+      <div><strong>Raziščite</strong><a href="{{ url_for('league.results') }}">Liga Radgona</a><a href="{{ url_for('league.archive') }}">Arhiv lige</a><a href="{{ url_for('reservations.calendar') }}">Rezervacija</a><a href="{{ url_for('public.news_index') }}">Novice</a>{% if current_user.is_authenticated %}<a href="{{ url_for('public.gallery_index') }}">Galerija</a>{% endif %}</div>
       <div><strong>Klub</strong><a href="{{ url_for('public.club_section', section_key='about') }}">O klubu</a><a href="{{ url_for('public.club_section', section_key='leadership') }}">Organi kluba</a><a href="{{ url_for('public.club_section', section_key='statute') }}">Statut kluba</a>{% if current_user.is_authenticated %}<a href="{{ url_for('public.club_section', section_key='members') }}">Člani</a>{% endif %}<a href="{{ url_for('public.club_section', section_key='membership') }}">Članarina/Igralnina</a></div>
     </div>
     <div class="wrap footer-bottom"><span>© {{ current_year }} Teniški klub Gornja Radgona</span><span>Gornja Radgona, Slovenija</span></div>

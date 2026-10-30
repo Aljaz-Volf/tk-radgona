@@ -1,5 +1,4 @@
 <nav class="section-tabs" aria-label="Liga Radgona">
-  <a class="{{ 'active' if request.endpoint == 'league.rules' else '' }}" href="{{ url_for('league.rules') }}">Pravilnik lige</a>
   <a class="{{ 'active' if request.endpoint == 'league.results' else '' }}" href="{{ url_for('league.results') }}">Rezultati</a>
   <a class="{{ 'active' if request.endpoint == 'league.standings' else '' }}" href="{{ url_for('league.standings') }}">Razvrstitve</a>
   <a class="{{ 'active' if request.endpoint == 'league.schedule' else '' }}" href="{{ url_for('league.schedule') }}">Razpored tekem</a>

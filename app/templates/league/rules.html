@@ -1,11 +1,14 @@
 {% extends "base.html" %}
 {% block title %}Pravilnik lige | Liga Radgona{% endblock %}
 {% block content %}
-<header class="page-header"><div class="wrap"><div class="kicker">Liga Radgona</div><h1>Pravilnik lige</h1><p>Pravila aktualne sezone Lige Radgona.</p></div></header>
-<section class="section"><div class="wrap">{% include "league/_nav.html" %}
-  {% if season and season.rules %}<article class="card panel article-body rules-copy"><div class="kicker">{{ season.name }}</div>{{ season.rules }}</article>
-  {% elif season %}<div class="empty-state"><strong>Pravilnik še ni objavljen.</strong>Administrator ga lahko vnese pri urejanju sezone.</div>
-  {% else %}<div class="empty-state"><strong>Aktualna sezona še ni objavljena.</strong>Pravilnik bo na voljo po objavi sezone.</div>{% endif %}
+<header class="page-header"><div class="wrap"><div class="kicker">Liga Radgona</div><h1>Pravilnik lige</h1><p>Uradni pravilnik Teniške lige Radgona.</p></div></header>
+<section class="section"><div class="wrap">
+  <div class="document-toolbar card"><div><div class="kicker">Uradni dokument</div><h2>Pravilnik Teniške lige Radgona 2022</h2><p>Dokument je prikazan spodaj, lahko pa ga odprete tudi v novem zavihku.</p></div><a class="button" href="{{ url_for('static', filename='documents/pravilnik-teniske-lige-radgona-2022.pdf') }}" target="_blank" rel="noopener noreferrer">Odpri PDF ↗</a></div>
+  <div class="pdf-viewer card">
+    <object data="{{ url_for('static', filename='documents/pravilnik-teniske-lige-radgona-2022.pdf') }}#view=FitH" type="application/pdf" aria-label="Pravilnik Teniške lige Radgona 2022">
+      <div class="empty-state"><strong>Pregledovalnik PDF ni na voljo.</strong><a class="text-link" href="{{ url_for('static', filename='documents/pravilnik-teniske-lige-radgona-2022.pdf') }}" target="_blank" rel="noopener noreferrer">Odprite pravilnik v novem zavihku →</a></div>
+    </object>
+  </div>
 </div></section>
 {% endblock %}
 

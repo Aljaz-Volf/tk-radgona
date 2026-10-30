@@ -6,7 +6,7 @@ from flask.cli import with_appcontext
 from flask_migrate import upgrade
 
 from .extensions import db
-from .models import ClubContent, Court, NewsCategory, Role, User
+from .models import ClubContent, Court, Role, User
 from .services.content import sanitize_rich_text
 
 
@@ -59,8 +59,6 @@ def seed_development(confirm_fictional):
         raise click.ClickException("Pass --confirm-fictional to add development-only content.")
     if os.getenv("FLASK_ENV") == "production":
         raise click.ClickException("Development seed is disabled in production.")
-    if not NewsCategory.query.filter_by(slug="klub").first():
-        db.session.add(NewsCategory(name="Klub", slug="klub"))
     if not Court.query.first():
         db.session.add(Court(name="Razvojno igrišče 1 (demo)", surface="peščena", opening_time=time(7), closing_time=time(22)))
     if not ClubContent.query.filter_by(section_key="about").first():

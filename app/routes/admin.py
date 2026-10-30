@@ -5,7 +5,6 @@ from flask_login import current_user
 
 from ..extensions import db
 from ..forms import (
-    CategoryForm,
     ClubContentForm,
     CommitteeForm,
     CommitteeMemberForm,
@@ -37,7 +36,7 @@ from ..models import (
     MatchSet,
     Member,
     NewsArticle,
-    NewsCategory,
+    NewsArticleImage,
     Player,
     Reservation,
     Role,
@@ -49,6 +48,7 @@ from ..services.audit import record
 from ..services.content import sanitize_rich_text, unique_slug
 from ..services.scoring import parse_score
 from ..services.standings import recalculate_group
+from ..services.time import local_to_utc, utc_now_naive, utc_to_local
 from ..services.uploads import delete_image, save_image
 from ..services.reservations import ReservationConflict, create_reservation
 
@@ -79,27 +79,97 @@ def dashboard():
     return render_template("admin/dashboard.html", stats=stats, activity=activity)
 
 
-@bp.route("/novice", methods=["GET", "POST"])
+@bp.get("/novice")
 def news():
-    category_form = CategoryForm(prefix="category")
-    if category_form.submit.data and category_form.validate_on_submit():
-        category = NewsCategory(name=category_form.name.data, slug=unique_slug(NewsCategory, category_form.name.data))
-        db.session.add(category)
-        record("news.category_create", category)
-        db.session.commit()
-        flash("Kategorija je dodana.", "success")
-        return redirect(url_for("admin.news"))
     articles = NewsArticle.query.order_by(NewsArticle.created_at.desc()).all()
-    return render_template("admin/news/index.html", articles=articles, category_form=category_form)
+    pinned_article = next(
+        (article for article in articles if article.is_pinned and article.is_public), None
+    )
+    return render_template(
+        "admin/news/index.html",
+        articles=articles,
+        pinned_article=pinned_article,
+    )
+
+
+@bp.post("/novice/domaca-stran")
+def news_homepage_selection():
+    mode = request.form.get("homepage_mode", "latest")
+    if mode == "latest":
+        NewsArticle.query.update({NewsArticle.is_pinned: False}, synchronize_session=False)
+        db.session.commit()
+        flash("Domača stran bo prikazovala najnovejšo objavljeno novico.", "success")
+        return redirect(url_for("admin.news"))
+
+    if mode != "pinned":
+        abort(400)
+
+    try:
+        article_id = int(request.form.get("pinned_article_id", ""))
+    except (TypeError, ValueError):
+        flash("Izberite novico, ki jo želite pripeti.", "error")
+        return redirect(url_for("admin.news"))
+
+    article = db.session.get(NewsArticle, article_id)
+    if article is None or not article.is_public:
+        flash("Pripnete lahko samo že objavljeno novico.", "error")
+        return redirect(url_for("admin.news"))
+
+    NewsArticle.query.filter(NewsArticle.id != article.id).update(
+        {NewsArticle.is_pinned: False}, synchronize_session=False
+    )
+    article.is_pinned = True
+    record("news.homepage_pin", article, {"title": article.title})
+    db.session.commit()
+    flash("Izbrana novica je pripeta na domačo stran.", "success")
+    return redirect(url_for("admin.news"))
 
 
 def _news_form(article=None):
     form = NewsForm(obj=article)
-    form.category_id.choices = [(0, "Brez kategorije")] + [(item.id, item.name) for item in NewsCategory.query.order_by(NewsCategory.name)]
-    if request.method == "GET" and article:
-        form.category_id.data = article.category_id or 0
-        form.body.data = article.body_html
+    if request.method == "GET":
+        if article:
+            form.body.data = article.body_html
+            form.published_at.data = utc_to_local(article.published_at)
+        else:
+            form.published_at.data = utc_to_local(utc_now_naive())
     return form
+
+
+def _save_news_article(article, form):
+    uploads = [upload for upload in (form.images.data or []) if upload and upload.filename]
+    existing_count = len(article.images) + (1 if article.image_key else 0)
+    if existing_count + len(uploads) > 100:
+        form.images.errors.append(
+            f"Članek ima lahko največ 100 fotografij. Trenutno jih ima {existing_count}."
+        )
+        return False
+
+    _set_article(article, form)
+    db.session.add(article)
+    db.session.flush()
+    saved_keys = []
+    try:
+        start_order = len(article.images)
+        for offset, upload in enumerate(uploads):
+            key, width, height = save_image(upload, f"news/{article.id}")
+            saved_keys.append(key)
+            db.session.add(
+                NewsArticleImage(
+                    article=article,
+                    storage_key=key,
+                    width=width,
+                    height=height,
+                    sort_order=start_order + offset,
+                )
+            )
+    except ValueError as error:
+        db.session.rollback()
+        for key in saved_keys:
+            delete_image(key)
+        form.images.errors.append(str(error))
+        return False
+    return True
 
 
 @bp.route("/novice/nova", methods=["GET", "POST"])
@@ -107,13 +177,11 @@ def news_create():
     form = _news_form()
     if form.validate_on_submit():
         article = NewsArticle(author=current_user)
-        _set_article(article, form)
-        db.session.add(article)
-        db.session.flush()
-        record("news.create", article)
-        db.session.commit()
-        flash("Članek je shranjen.", "success")
-        return redirect(url_for("admin.news"))
+        if _save_news_article(article, form):
+            record("news.create", article)
+            db.session.commit()
+            flash("Članek je shranjen.", "success")
+            return redirect(url_for("admin.news"))
     return render_template("admin/news/form.html", form=form, article=None)
 
 
@@ -122,32 +190,46 @@ def news_edit(article_id):
     article = db.get_or_404(NewsArticle, article_id)
     form = _news_form(article)
     if form.validate_on_submit():
-        _set_article(article, form)
-        record("news.update", article)
-        db.session.commit()
-        flash("Članek je posodobljen.", "success")
-        return redirect(url_for("admin.news"))
+        if _save_news_article(article, form):
+            record("news.update", article)
+            db.session.commit()
+            flash("Članek je posodobljen.", "success")
+            return redirect(url_for("admin.news"))
     return render_template("admin/news/form.html", form=form, article=article)
 
 
 def _set_article(article, form):
     article.title = form.title.data.strip()
     article.slug = unique_slug(NewsArticle, article.title, article.id)
-    article.category_id = form.category_id.data or None
     article.summary = form.summary.data
     article.body_html = sanitize_rich_text(form.body.data)
     article.status = form.status.data
-    article.published_at = form.published_at.data
+    article.published_at = local_to_utc(form.published_at.data)
     if article.status == "published" and not article.published_at:
-        article.published_at = datetime.now(timezone.utc)
-    if form.image.data:
-        article.image_key, _, _ = save_image(form.image.data, "news")
+        article.published_at = utc_now_naive()
+
+
+@bp.post("/novice/slika/<int:image_id>/izbrisi")
+def news_image_delete(image_id):
+    image = db.get_or_404(NewsArticleImage, image_id)
+    article_id = image.article_id
+    record("news_image.delete", image)
+    delete_image(image.storage_key)
+    db.session.delete(image)
+    db.session.commit()
+    flash("Fotografija je odstranjena iz članka.", "success")
+    return redirect(url_for("admin.news_edit", article_id=article_id))
 
 
 @bp.post("/novice/<int:article_id>/izbrisi")
 def news_delete(article_id):
     article = db.get_or_404(NewsArticle, article_id)
     record("news.delete", article, {"title": article.title})
+    keys = [image.storage_key for image in article.images]
+    if article.image_key:
+        keys.append(article.image_key)
+    for key in set(keys):
+        delete_image(key)
     db.session.delete(article)
     db.session.commit()
     flash("Članek je izbrisan.", "success")

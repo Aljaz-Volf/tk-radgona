@@ -1,5 +1,75 @@
-{% extends "admin/base.html" %}{% from "macros/forms.html" import field %}{% block admin_title %}Novice{% endblock %}
-{% block admin_content %}<div class="admin-heading"><div><h1>Novice</h1><p>Osnutki in objavljeni članki.</p></div><a class="button" href="{{ url_for('admin.news_create') }}">Nov članek</a></div>
-<div class="card panel">{% if articles %}<div class="table-wrap"><table><thead><tr><th>Naslov</th><th>Kategorija</th><th>Stanje</th><th>Objava</th><th></th></tr></thead><tbody>{% for article in articles %}<tr><td><a class="table-link" href="{{ url_for('admin.news_edit', article_id=article.id) }}">{{ article.title }}</a></td><td>{{ article.category.name if article.category else '—' }}</td><td><span class="status status-{{ article.status }}">{{ 'Objavljeno' if article.status == 'published' else 'Osnutek' }}</span></td><td>{{ article.published_at.strftime('%d. %m. %Y') if article.published_at else '—' }}</td><td><div class="actions"><a class="button button-secondary button-small" href="{{ url_for('admin.news_edit', article_id=article.id) }}">Uredi</a><form method="post" action="{{ url_for('admin.news_delete', article_id=article.id) }}" data-confirm="Izbrišem članek?"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button button-danger button-small" type="submit">Izbriši</button></form></div></td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state">Člankov še ni.</div>{% endif %}</div>
-<div class="card panel admin-section"><h3>Nova kategorija</h3><form method="post" class="form-grid">{{ category_form.hidden_tag() }}{{ field(category_form.name) }}<div class="form-field"><label>&nbsp;</label>{{ category_form.submit(class_='button') }}</div></form></div>{% endblock %}
+{% extends "admin/base.html" %}
+{% block admin_title %}Novice{% endblock %}
+{% block admin_content %}
+<div class="admin-heading">
+  <div><h1>Novice</h1><p>Osnutki in objavljeni članki.</p></div>
+  <a class="button" href="{{ url_for('admin.news_create') }}">Nov članek</a>
+</div>
 
+<section class="card panel news-homepage-picker" data-news-homepage-picker data-mode="{{ 'pinned' if pinned_article else 'latest' }}">
+  <div class="news-picker-heading">
+    <div><div class="kicker">Domača stran</div><h2>Izpostavljena novica</h2></div>
+    <p>Samodejno prikažite najnovejšo novico ali ročno pripnite eno izmed objavljenih.</p>
+  </div>
+  <form method="post" action="{{ url_for('admin.news_homepage_selection') }}" class="news-picker-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="homepage_mode" value="{{ 'pinned' if pinned_article else 'latest' }}" data-homepage-mode>
+    <div class="homepage-mode-toggle" role="group" aria-label="Način prikaza novice na domači strani">
+      <button type="button" class="homepage-mode-option" data-mode-choice="latest" aria-pressed="{{ 'false' if pinned_article else 'true' }}">Aktualna</button>
+      <button type="button" class="homepage-mode-option" data-mode-choice="pinned" aria-pressed="{{ 'true' if pinned_article else 'false' }}">Pripni</button>
+    </div>
+    <p class="homepage-mode-help" data-mode-help>
+      {% if pinned_article %}Na domači strani bo prikazana samo izbrana novica.{% else %}Na domači strani bo vedno prikazana najnovejša objavljena novica.{% endif %}
+    </p>
+
+    <div class="pinned-news-options" data-pinned-options aria-hidden="{{ 'false' if pinned_article else 'true' }}">
+      <div class="pinned-news-options-inner">
+        <fieldset>
+          <legend>Izberite eno novico</legend>
+          <div class="pinned-news-list">
+            {% for article in articles %}
+              {% set selectable = article.is_public %}
+              <label class="pinned-news-choice{% if not selectable %} is-unavailable{% endif %}">
+                <input type="radio" name="pinned_article_id" value="{{ article.id }}"{% if article.is_pinned and selectable %} checked{% endif %}{% if not selectable %} disabled{% endif %}>
+                <span class="pinned-news-check" aria-hidden="true"></span>
+                <span class="pinned-news-copy">
+                  <strong>{{ article.title }}</strong>
+                  <small>
+                    {% if article.status != 'published' %}Osnutek — najprej ga objavite
+                    {% elif not article.is_public %}Načrtovana objava
+                    {% else %}Objavljeno {{ article.published_at.strftime('%d. %m. %Y') }}{% endif %}
+                  </small>
+                </span>
+              </label>
+            {% else %}
+              <div class="empty-state">Najprej ustvarite in objavite novico.</div>
+            {% endfor %}
+          </div>
+        </fieldset>
+      </div>
+    </div>
+    <button class="button" type="submit">Shrani prikaz</button>
+  </form>
+</section>
+
+<div class="card panel admin-section">
+  {% if articles %}
+    <div class="table-wrap"><table>
+      <thead><tr><th>Naslov</th><th>Stanje</th><th>Objava</th><th></th></tr></thead>
+      <tbody>{% for article in articles %}<tr>
+        <td><a class="table-link" href="{{ url_for('admin.news_edit', article_id=article.id) }}">{{ article.title }}</a>{% if article.is_pinned and article.is_public %} <span class="tag">Pripeta</span>{% endif %}</td>
+        <td><span class="status status-{{ article.status }}">{{ 'Objavljeno' if article.status == 'published' else 'Osnutek' }}</span></td>
+        <td>{{ article.published_at.strftime('%d. %m. %Y') if article.published_at else '—' }}</td>
+        <td><div class="actions">
+          <a class="button button-secondary button-small" href="{{ url_for('admin.news_edit', article_id=article.id) }}">Uredi</a>
+          <form method="post" action="{{ url_for('admin.news_delete', article_id=article.id) }}" data-confirm="Izbrišem članek?">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="button button-danger button-small" type="submit">Izbriši</button>
+          </form>
+        </div></td>
+      </tr>{% endfor %}</tbody>
+    </table></div>
+  {% else %}<div class="empty-state">Člankov še ni.</div>{% endif %}
+</div>
+
+{% endblock %}
