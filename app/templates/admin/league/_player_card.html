@@ -1,0 +1,6 @@
+<article class="league-player-card" draggable="true" tabindex="0" data-player-id="{{ row.player.id }}" data-player-name="{{ row.player.display_name|lower }}" data-is-new="{{ 'true' if row.is_new else 'false' }}" data-previous-name="{{ row.previous_name }}" data-previous-index="{{ row.previous_index if row.previous_index is not none else '' }}" data-previous-label="{{ row.previous_label }}" aria-pressed="false">
+  <span class="league-drag-handle" aria-hidden="true">⠿</span>
+  <span class="league-player-seed" data-player-seed></span>
+  <strong>{{ row.player.display_name }}</strong>
+  <small data-player-tag></small>
+</article>

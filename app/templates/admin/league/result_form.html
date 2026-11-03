@@ -1,2 +1,96 @@
-{% extends "admin/base.html" %}{% from "macros/forms.html" import render_form %}{% block admin_title %}Rezultat{% endblock %}{% block admin_content %}<div class="admin-heading"><div><h1>Vpis rezultata</h1><p>{{ match.player1.display_name }} — {{ match.player2.display_name }}</p></div><a class="button button-secondary" href="{{ url_for('admin.matches') }}">Nazaj</a></div><div class="card panel"><p>Vnesite zaključene nize, ločene z vejico. Podprt je tudi odločilni podaljšani niz, npr. <strong>6-4, 3-6, 10-8</strong>.</p>{{ render_form(form) }}</div>{% endblock %}
+{% extends "admin/base.html" %}
+{% block admin_title %}Vpis rezultata{% endblock %}
+{% block admin_content %}
+{% set player1_parts = match.player1.display_name.split() %}
+{% set player2_parts = match.player2.display_name.split() %}
+<div class="admin-heading match-result-heading">
+  <div>
+    <h1>Vpis rezultata</h1>
+    <p>{{ match.player1.display_name }} — {{ match.player2.display_name }}</p>
+  </div>
+  <a class="button button-secondary button-small" href="{{ url_for('admin.matches') }}">Nazaj</a>
+</div>
 
+<form method="post" class="card match-result-card" data-match-result-form data-player-one="{{ match.player1.display_name }}" data-player-two="{{ match.player2.display_name }}">
+  {{ form.hidden_tag() }}
+  <div class="match-result-card-heading">
+    <span>Rezultat po nizih</span>
+    <small>Igra se na dva dobljena niza</small>
+  </div>
+
+  <div class="match-score-scroll">
+    <div class="match-score-grid" role="group" aria-label="Rezultat po nizih">
+      <div></div>
+      <div class="match-set-heading">1. niz</div>
+      <div class="match-set-heading">2. niz</div>
+      <div class="match-set-heading match-set-heading-decider">3. niz · odločilni</div>
+      <div class="match-set-heading">Nizi</div>
+
+      <div class="match-player">
+        <span class="match-player-avatar">{{ player1_parts[0][0] }}{{ player1_parts[-1][0] if player1_parts|length > 1 else '' }}</span>
+        <strong>{{ match.player1.display_name }}</strong>
+      </div>
+      {% for field, number in [(form.set1_player1, 1), (form.set2_player1, 2), (form.set3_player1, 3)] %}
+        <div class="match-score-cell" data-score-cell data-set="{{ number }}" data-player="1">
+          <label class="sr-only" for="{{ field.id }}">{{ field.label.text }}</label>
+          {{ field(class_="match-score-input", autocomplete="off", data_set=number, data_player="1") }}
+        </div>
+      {% endfor %}
+      <output class="match-sets-won" data-sets-won="1">0</output>
+
+      <div class="match-player">
+        <span class="match-player-avatar match-player-avatar-alt">{{ player2_parts[0][0] }}{{ player2_parts[-1][0] if player2_parts|length > 1 else '' }}</span>
+        <strong>{{ match.player2.display_name }}</strong>
+      </div>
+      {% for field, number in [(form.set1_player2, 1), (form.set2_player2, 2), (form.set3_player2, 3)] %}
+        <div class="match-score-cell" data-score-cell data-set="{{ number }}" data-player="2">
+          <label class="sr-only" for="{{ field.id }}">{{ field.label.text }}</label>
+          {{ field(class_="match-score-input", autocomplete="off", data_set=number, data_player="2") }}
+        </div>
+      {% endfor %}
+      <output class="match-sets-won" data-sets-won="2">0</output>
+    </div>
+  </div>
+
+  {% set score_fields = [form.score, form.set1_player1, form.set1_player2, form.set2_player1, form.set2_player2, form.set3_player1, form.set3_player2] %}
+  {% if score_fields|selectattr('errors')|list %}
+    <div class="match-score-errors" role="alert">
+      {% for field in score_fields %}{% for error in field.errors %}<span>{{ error }}</span>{% endfor %}{% endfor %}
+    </div>
+  {% endif %}
+
+  <div class="match-result-hint" data-result-hint>
+    <span aria-hidden="true">!</span>
+    <p>Po dveh nizih je 1:1, zato se vpiše še odločilni 3. niz do 10. Če zmaga isti igralec v obeh nizih, tretji niz ni potreben.</p>
+  </div>
+
+  <div class="match-live-summary" aria-live="polite">
+    <div>
+      <span>Zapis rezultata</span>
+      <strong data-result-summary>—</strong>
+    </div>
+    <div class="match-live-winner">
+      <span>Zmagovalec</span>
+      <strong data-result-winner>Rezultat še ni popoln</strong>
+    </div>
+  </div>
+
+  <div class="match-result-meta">
+    <div class="form-field{% if form.played_at.errors %} has-error{% endif %}">
+      {{ form.played_at.label }}
+      {{ form.played_at(class_="input") }}
+      {% for error in form.played_at.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+    </div>
+    <div class="form-field match-result-notes{% if form.notes.errors %} has-error{% endif %}">
+      <label for="{{ form.notes.id }}">Opombe <span>(neobvezno)</span></label>
+      {{ form.notes(class_="input", rows="1", placeholder="Npr. igrišče, razmere, poškodba …") }}
+      {% for error in form.notes.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+    </div>
+  </div>
+
+  <div class="match-result-actions">
+    <a class="button button-secondary" href="{{ url_for('admin.matches') }}">Prekliči</a>
+    {{ form.submit(class_="button") }}
+  </div>
+</form>
+{% endblock %}

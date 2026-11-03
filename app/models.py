@@ -115,11 +115,15 @@ class Season(TimestampMixin, db.Model):
     is_published = db.Column(db.Boolean, nullable=False, default=False)
     win_points = db.Column(db.Integer, nullable=False, default=2)
     loss_points = db.Column(db.Integer, nullable=False, default=0)
+    promotions_per_boundary = db.Column(db.Integer, nullable=False, default=2)
+    setup_pending = db.Column(db.Boolean, nullable=False, default=False)
+    publish_after_setup = db.Column(db.Boolean, nullable=False, default=False)
     rules = db.Column(db.Text)
     __table_args__ = (
         CheckConstraint("ends_on >= starts_on", name="valid_dates"),
         CheckConstraint("win_points >= 0", name="nonnegative_win_points"),
         CheckConstraint("loss_points >= 0", name="nonnegative_loss_points"),
+        CheckConstraint("promotions_per_boundary between 0 and 8", name="valid_promotions_per_boundary"),
     )
 
 
@@ -129,8 +133,14 @@ class LeagueGroup(TimestampMixin, db.Model):
     season_id = db.Column(db.Integer, db.ForeignKey("seasons.id", ondelete="CASCADE"), nullable=False, index=True)
     name = db.Column(db.String(100), nullable=False)
     sort_order = db.Column(db.Integer, nullable=False, default=0)
+    max_players = db.Column(db.Integer, nullable=False, default=8)
+    source_group_id = db.Column(db.Integer, db.ForeignKey("league_groups.id", ondelete="SET NULL"), index=True)
     season = db.relationship("Season", backref=db.backref("groups", cascade="all, delete-orphan", order_by="LeagueGroup.sort_order"))
-    __table_args__ = (UniqueConstraint("season_id", "name"),)
+    source_group = db.relationship("LeagueGroup", remote_side=[id], foreign_keys=[source_group_id])
+    __table_args__ = (
+        UniqueConstraint("season_id", "name"),
+        CheckConstraint("max_players between 1 and 64", name="valid_max_players"),
+    )
 
 
 class LeagueMembership(db.Model):

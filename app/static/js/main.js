@@ -592,3 +592,573 @@ if (lightbox) {
   }
 }
 
+document.querySelectorAll('[data-match-result-form]').forEach((form) => {
+  const playerNames = [form.dataset.playerOne, form.dataset.playerTwo];
+  const hiddenScore = form.querySelector('input[name="score"]');
+  const summary = form.querySelector('[data-result-summary]');
+  const winnerSummary = form.querySelector('[data-result-winner]');
+  const hint = form.querySelector('[data-result-hint]');
+  const setOutputs = [
+    form.querySelector('[data-sets-won="1"]'),
+    form.querySelector('[data-sets-won="2"]'),
+  ];
+  const inputs = [...form.querySelectorAll('.match-score-input')];
+  let resultComplete = false;
+
+  let clientError = form.querySelector('[data-client-score-error]');
+  if (!clientError) {
+    clientError = document.createElement('div');
+    clientError.className = 'match-score-errors';
+    clientError.dataset.clientScoreError = '';
+    clientError.setAttribute('role', 'alert');
+    clientError.hidden = true;
+    hint.before(clientError);
+  }
+
+  const inputFor = (set, player) => form.querySelector(`.match-score-input[data-set="${set}"][data-player="${player}"]`);
+  const valueOf = (set, player) => {
+    const raw = inputFor(set, player)?.value.trim();
+    if (raw === '') return null;
+    const value = Number(raw);
+    return Number.isInteger(value) && value >= 0 ? value : null;
+  };
+  const isStandardSet = (first, second) => {
+    const high = Math.max(first, second);
+    const low = Math.min(first, second);
+    return (high === 6 && low <= 4) || (high === 7 && (low === 5 || low === 6));
+  };
+  const isMatchTiebreak = (first, second) => Math.max(first, second) >= 10 && Math.abs(first - second) >= 2;
+
+  const evaluateSet = (set, validator) => {
+    const first = valueOf(set, 1);
+    const second = valueOf(set, 2);
+    const cells = [1, 2].map((player) => inputFor(set, player)?.closest('[data-score-cell]'));
+    cells.forEach((cell) => cell?.classList.remove('is-winner', 'is-loser'));
+    if (first === null || second === null || first === second || !validator(first, second)) return 0;
+    const winner = first > second ? 1 : 2;
+    cells[winner - 1]?.classList.add('is-winner');
+    cells[2 - winner]?.classList.add('is-loser');
+    return winner;
+  };
+
+  const update = () => {
+    const firstWinner = evaluateSet(1, isStandardSet);
+    const secondWinner = evaluateSet(2, isStandardSet);
+    const splitSets = firstWinner > 0 && secondWinner > 0 && firstWinner !== secondWinner;
+    const straightSets = firstWinner > 0 && firstWinner === secondWinner;
+    const thirdInputs = [inputFor(3, 1), inputFor(3, 2)];
+
+    thirdInputs.forEach((input) => {
+      input.disabled = !splitSets;
+      input.closest('[data-score-cell]')?.classList.toggle('is-disabled', !splitSets);
+      if (!splitSets) input.value = '';
+    });
+    const thirdWinner = splitSets ? evaluateSet(3, isMatchTiebreak) : 0;
+    if (!splitSets) {
+      [1, 2].forEach((player) => inputFor(3, player)?.closest('[data-score-cell]')?.classList.remove('is-winner', 'is-loser'));
+    }
+
+    const wins = [0, 0];
+    [firstWinner, secondWinner, thirdWinner].forEach((winner) => {
+      if (winner) wins[winner - 1] += 1;
+    });
+    setOutputs.forEach((output, index) => {
+      output.value = String(wins[index]);
+      output.textContent = String(wins[index]);
+      output.classList.toggle('is-leading', wins[index] > wins[1 - index]);
+    });
+
+    const parts = [];
+    [1, 2].forEach((set) => {
+      const first = valueOf(set, 1);
+      const second = valueOf(set, 2);
+      if (first !== null && second !== null) parts.push(`${first}-${second}`);
+    });
+    if (splitSets) {
+      const first = valueOf(3, 1);
+      const second = valueOf(3, 2);
+      if (first !== null && second !== null) parts.push(`${first}-${second}`);
+    }
+    hiddenScore.value = parts.join(', ');
+    summary.textContent = parts.length ? parts.join(', ') : '—';
+
+    resultComplete = straightSets || (splitSets && thirdWinner > 0);
+    if (resultComplete) {
+      const winnerIndex = wins[0] > wins[1] ? 0 : 1;
+      winnerSummary.textContent = `${playerNames[winnerIndex]} · ${wins[0]}:${wins[1]}`;
+      clientError.hidden = true;
+    } else {
+      winnerSummary.textContent = 'Rezultat še ni popoln';
+    }
+
+    if (splitSets) {
+      hint.dataset.state = 'decider';
+      hint.querySelector('p').textContent = 'Po dveh nizih je 1:1. Vpišite še odločilni 3. niz do najmanj 10 točk in na dve točki razlike.';
+    } else if (straightSets) {
+      hint.dataset.state = 'straight';
+      hint.querySelector('p').textContent = 'Isti igralec je dobil oba niza. Tekma je zaključena z 2:0, zato tretji niz ni potreben.';
+    } else {
+      hint.dataset.state = 'incomplete';
+      hint.querySelector('p').textContent = 'Vpišite prva dva niza. Če bo rezultat 1:1, se bo omogočil odločilni 3. niz do 10.';
+    }
+  };
+
+  inputs.forEach((input) => {
+    input.addEventListener('input', update);
+    input.addEventListener('focus', () => input.select());
+  });
+  form.addEventListener('submit', (event) => {
+    update();
+    if (!resultComplete) {
+      event.preventDefault();
+      clientError.innerHTML = '<span>Vnesite veljaven končni rezultat tekme.</span>';
+      clientError.hidden = false;
+      const firstEmpty = inputs.find((input) => !input.disabled && input.value.trim() === '');
+      (firstEmpty || inputs.find((input) => !input.disabled))?.focus();
+    }
+  });
+  update();
+});
+
+document.querySelectorAll('[data-league-sorter]').forEach((sorter) => {
+  const assignmentInput = sorter.querySelector('[data-league-assignments]');
+  const columns = [...sorter.querySelectorAll('[data-league-column]')];
+  const cards = [...sorter.querySelectorAll('[data-player-id]')];
+  const cardsById = new Map(cards.map((card) => [String(card.dataset.playerId), card]));
+  const suggestionElement = sorter.querySelector('[data-league-suggestion]');
+  const suggestButton = document.querySelector('[data-league-suggest]');
+  const search = sorter.querySelector('[data-player-search]');
+  const filterButtons = [...sorter.querySelectorAll('[data-player-filter]')];
+  let activeFilter = 'all';
+  let selectedCard = null;
+
+  const listForGroup = (groupId) => columns.find((column) => column.dataset.groupId === String(groupId))?.querySelector('[data-player-list]');
+  const cardsIn = (column) => [...column.querySelector('[data-player-list]').querySelectorAll('[data-player-id]')];
+  const canReceive = (column, card) => {
+    if (!column.dataset.groupId) return true;
+    const capacity = Number(column.dataset.capacity);
+    return card.closest('[data-league-column]') === column || cardsIn(column).length < capacity;
+  };
+
+  const updateTag = (card) => {
+    const tag = card.querySelector('[data-player-tag]');
+    const column = card.closest('[data-league-column]');
+    const currentIndex = Number(column.dataset.groupIndex);
+    const previousIndex = card.dataset.previousIndex === '' ? null : Number(card.dataset.previousIndex);
+    tag.className = '';
+
+    if (card.dataset.isNew === 'true') {
+      tag.textContent = 'Nov';
+      tag.classList.add('is-new');
+    } else if (currentIndex < 0 || previousIndex === currentIndex) {
+      tag.textContent = `${card.dataset.previousLabel || 'Prej'}: ${card.dataset.previousName}`;
+    } else if (previousIndex !== null && currentIndex < previousIndex) {
+      tag.textContent = `↑ iz ${card.dataset.previousName}`;
+      tag.classList.add('is-promoted');
+    } else if (previousIndex !== null && currentIndex > previousIndex) {
+      tag.textContent = `↓ iz ${card.dataset.previousName}`;
+      tag.classList.add('is-relegated');
+    } else {
+      tag.textContent = card.dataset.previousName;
+    }
+  };
+
+  const sync = () => {
+    const payload = { groups: {}, unassigned: [] };
+    columns.forEach((column) => {
+      const columnCards = cardsIn(column);
+      const count = column.querySelector('[data-column-count]');
+      count.textContent = String(columnCards.length);
+      column.classList.toggle('is-full', Boolean(column.dataset.groupId) && columnCards.length >= Number(column.dataset.capacity));
+      const capacityBar = column.querySelector('[data-capacity-bar]');
+      if (capacityBar) capacityBar.style.width = `${Math.min(100, columnCards.length / Number(column.dataset.capacity) * 100)}%`;
+
+      columnCards.forEach((card, index) => {
+        const seed = card.querySelector('[data-player-seed]');
+        seed.textContent = column.dataset.groupId ? String(index + 1) : '';
+        updateTag(card);
+      });
+      const ids = columnCards.map((card) => Number(card.dataset.playerId));
+      if (column.dataset.groupId) payload.groups[column.dataset.groupId] = ids;
+      else payload.unassigned = ids;
+    });
+    assignmentInput.value = JSON.stringify(payload);
+    applyFilter();
+  };
+
+  const applyFilter = () => {
+    const query = (search?.value || '').trim().toLocaleLowerCase('sl');
+    const unassignedColumn = columns.find((column) => !column.dataset.groupId);
+    if (!unassignedColumn) return;
+    columns.filter((column) => column.dataset.groupId).forEach((column) => {
+      cardsIn(column).forEach((card) => { card.hidden = false; });
+    });
+    cardsIn(unassignedColumn).forEach((card) => {
+      const matchesSearch = !query || card.dataset.playerName.includes(query);
+      const matchesFilter = activeFilter === 'all'
+        || (activeFilter === 'new' && card.dataset.isNew === 'true')
+        || (activeFilter === 'returning' && card.dataset.isNew !== 'true');
+      card.hidden = !(matchesSearch && matchesFilter);
+    });
+  };
+
+  const selectCard = (card) => {
+    if (selectedCard && selectedCard !== card) selectedCard.setAttribute('aria-pressed', 'false');
+    selectedCard = selectedCard === card ? null : card;
+    card.setAttribute('aria-pressed', String(selectedCard === card));
+  };
+
+  const moveCard = (card, column, before = null) => {
+    if (!card || !canReceive(column, card)) return false;
+    const list = column.querySelector('[data-player-list]');
+    list.insertBefore(card, before);
+    card.setAttribute('aria-pressed', 'false');
+    selectedCard = null;
+    sync();
+    return true;
+  };
+
+  const cardAfterPointer = (list, pointerY) => {
+    const candidates = [...list.querySelectorAll('[data-player-id]:not(.is-dragging):not([hidden])')];
+    return candidates.reduce((closest, card) => {
+      const box = card.getBoundingClientRect();
+      const offset = pointerY - box.top - box.height / 2;
+      return offset < 0 && offset > closest.offset ? { offset, card } : closest;
+    }, { offset: Number.NEGATIVE_INFINITY, card: null }).card;
+  };
+
+  cards.forEach((card) => {
+    card.addEventListener('click', () => selectCard(card));
+    card.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        selectCard(card);
+      }
+    });
+    card.addEventListener('dragstart', (event) => {
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', card.dataset.playerId);
+      card.classList.add('is-dragging');
+    });
+    card.addEventListener('dragend', () => {
+      card.classList.remove('is-dragging');
+      columns.forEach((column) => column.classList.remove('is-drag-over'));
+    });
+  });
+
+  columns.forEach((column) => {
+    column.addEventListener('dragover', (event) => {
+      const card = sorter.querySelector('.league-player-card.is-dragging');
+      if (!card || !canReceive(column, card)) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'move';
+      columns.forEach((item) => item.classList.toggle('is-drag-over', item === column));
+    });
+    column.addEventListener('dragleave', (event) => {
+      if (!column.contains(event.relatedTarget)) column.classList.remove('is-drag-over');
+    });
+    column.addEventListener('drop', (event) => {
+      event.preventDefault();
+      const card = cardsById.get(event.dataTransfer.getData('text/plain'));
+      const list = column.querySelector('[data-player-list]');
+      moveCard(card, column, cardAfterPointer(list, event.clientY));
+      columns.forEach((item) => item.classList.remove('is-drag-over'));
+    });
+    column.querySelector('[data-drop-zone]')?.addEventListener('click', () => moveCard(selectedCard, column));
+    column.addEventListener('click', (event) => {
+      if (selectedCard && !event.target.closest('[data-player-id], button, input')) moveCard(selectedCard, column);
+    });
+  });
+
+  search?.addEventListener('input', applyFilter);
+  filterButtons.forEach((button) => button.addEventListener('click', () => {
+    activeFilter = button.dataset.playerFilter;
+    filterButtons.forEach((item) => item.classList.toggle('is-active', item === button));
+    applyFilter();
+  }));
+
+  suggestButton?.addEventListener('click', () => {
+    const suggestion = JSON.parse(suggestionElement.textContent);
+    Object.entries(suggestion.groups).forEach(([groupId, playerIds]) => {
+      const list = listForGroup(groupId);
+      playerIds.forEach((playerId) => list?.appendChild(cardsById.get(String(playerId))));
+    });
+    const unassignedList = listForGroup('');
+    suggestion.unassigned.forEach((playerId) => unassignedList?.appendChild(cardsById.get(String(playerId))));
+    sync();
+  });
+
+  sync();
+});
+
+document.querySelectorAll('[data-season-create-form]').forEach((form) => {
+  const list = form.querySelector('[data-season-league-list]');
+  const defaults = JSON.parse(form.querySelector('[data-default-leagues]').textContent);
+  const addButton = form.querySelector('[data-add-league]');
+  const resetButton = form.querySelector('[data-reset-leagues]');
+  const promotionsToggle = form.querySelector('input[name="apply_promotions"]');
+  const promotionsCount = form.querySelector('input[name="promotions_per_boundary"]');
+  let draggedRow = null;
+
+  const bindRow = (row) => {
+    const handle = row.querySelector('.season-league-handle');
+    row.querySelector('[data-delete-league]').addEventListener('click', () => row.remove());
+    handle.addEventListener('dragstart', (event) => {
+      draggedRow = row;
+      row.classList.add('is-dragging');
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', 'league-row');
+    });
+    handle.addEventListener('dragend', () => {
+      row.classList.remove('is-dragging');
+      draggedRow = null;
+    });
+  };
+
+  const createRow = (data = {}) => {
+    const row = document.createElement('div');
+    row.className = 'season-league-row';
+    row.dataset.seasonLeagueRow = '';
+    row.innerHTML = `
+      <button class="season-league-handle" type="button" draggable="true" aria-label="Premakni ligo" tabindex="-1">⠿</button>
+      <input type="hidden" name="league_source_group_id">
+      <label><span>Ime lige</span><input class="input" type="text" name="league_name" maxlength="100" required></label>
+      <label class="season-league-capacity"><span>Največ</span><input class="input" type="number" name="league_max_players" min="1" max="64" required><small>igralcev</small></label>
+      <button class="season-league-delete" type="button" data-delete-league aria-label="Izbriši ligo">×</button>`;
+    row.querySelector('[name="league_source_group_id"]').value = data.source_group_id || '';
+    row.querySelector('[name="league_name"]').value = data.name || '';
+    row.querySelector('[name="league_max_players"]').value = data.max_players || 8;
+    bindRow(row);
+    return row;
+  };
+
+  list.querySelectorAll('[data-season-league-row]').forEach(bindRow);
+  list.addEventListener('dragover', (event) => {
+    if (!draggedRow) return;
+    event.preventDefault();
+    const candidates = [...list.querySelectorAll('[data-season-league-row]:not(.is-dragging)')];
+    const after = candidates.reduce((closest, row) => {
+      const box = row.getBoundingClientRect();
+      const offset = event.clientY - box.top - box.height / 2;
+      return offset < 0 && offset > closest.offset ? { offset, row } : closest;
+    }, { offset: Number.NEGATIVE_INFINITY, row: null }).row;
+    list.insertBefore(draggedRow, after);
+  });
+  list.addEventListener('drop', (event) => event.preventDefault());
+  addButton.addEventListener('click', () => {
+    const row = createRow({ name: `${list.children.length + 1}. Liga`, max_players: 8 });
+    list.appendChild(row);
+    row.querySelector('[name="league_name"]').select();
+  });
+  resetButton.addEventListener('click', () => {
+    list.replaceChildren(...defaults.map(createRow));
+  });
+
+  const syncPromotionOption = () => {
+    promotionsCount.readOnly = !promotionsToggle.checked;
+    promotionsToggle.closest('.season-promotion-option').classList.toggle('is-disabled', !promotionsToggle.checked);
+  };
+  promotionsToggle.addEventListener('change', syncPromotionOption);
+  syncPromotionOption();
+});
+
+document.querySelectorAll('[data-movements-form]').forEach((form) => {
+  const checkboxes = [...form.querySelectorAll('input[name="moves"]')];
+  const confirmCount = form.querySelector('[data-confirm-count]');
+  const proposedCount = form.querySelector('[data-proposed-count]');
+  const updateCount = () => {
+    const count = checkboxes.filter((checkbox) => checkbox.checked).length;
+    confirmCount.textContent = String(count);
+    proposedCount.textContent = String(count);
+  };
+  checkboxes.forEach((checkbox) => checkbox.addEventListener('change', updateCount));
+  updateCount();
+});
+
+document.querySelectorAll('[data-match-form]').forEach((form) => {
+  const data = JSON.parse(form.querySelector('[data-match-player-data]').textContent);
+  const groupSelect = form.querySelector('[data-match-group]');
+  const pickers = [...form.querySelectorAll('[data-match-player-picker]')].map((element) => ({
+    element,
+    number: Number(element.dataset.matchPlayerPicker),
+    select: element.querySelector('[data-match-player-select]'),
+    trigger: element.querySelector('[data-player-trigger]'),
+    triggerLabel: element.querySelector('[data-trigger-label]'),
+    triggerAvatar: element.querySelector('[data-trigger-avatar]'),
+    popover: element.querySelector('[data-player-popover]'),
+    search: element.querySelector('[data-player-search]'),
+    options: element.querySelector('[data-player-options]'),
+    empty: element.querySelector('[data-player-empty]'),
+    groupLabel: element.querySelector('[data-picker-group-label]'),
+    showAllButton: element.querySelector('[data-show-all-players]'),
+    showAll: false,
+  }));
+
+  const currentGroup = () => data.groups[String(groupSelect.value)] || null;
+  const playerById = (id) => data.players[String(id)] || null;
+  const pickerByNumber = (number) => pickers.find((picker) => picker.number === number);
+  const pairKey = (firstId, secondId) => [Number(firstId), Number(secondId)].sort((a, b) => a - b).join(':');
+
+  const closePicker = (picker, returnFocus = false) => {
+    picker.popover.hidden = true;
+    picker.element.classList.remove('is-open');
+    picker.trigger.setAttribute('aria-expanded', 'false');
+    if (returnFocus) picker.trigger.focus();
+  };
+  const closeAll = (except = null) => pickers.forEach((picker) => {
+    if (picker !== except) closePicker(picker);
+  });
+
+  const updateTrigger = (picker) => {
+    const player = playerById(picker.select.value);
+    if (!player) {
+      picker.triggerLabel.textContent = picker.number === 1 ? 'Izberi prvega igralca' : 'Izberi nasprotnika';
+      picker.triggerAvatar.hidden = true;
+      return;
+    }
+    picker.triggerLabel.textContent = player.name;
+    picker.triggerAvatar.textContent = player.initials;
+    picker.triggerAvatar.hidden = false;
+  };
+
+  const renderPicker = (picker) => {
+    const group = currentGroup();
+    const query = picker.search.value.trim().toLocaleLowerCase('sl');
+    const groupPlayers = group?.players || [];
+    const groupPlayerMap = new Map(groupPlayers.map((player) => [String(player.id), player]));
+    const players = picker.showAll
+      ? Object.values(data.players).sort((first, second) => first.name.localeCompare(second.name, 'sl'))
+      : groupPlayers;
+    const otherPicker = pickerByNumber(picker.number === 1 ? 2 : 1);
+    const otherSelectedId = Number(otherPicker.select.value || 0);
+    const firstPlayerId = Number(pickerByNumber(1).select.value || 0);
+
+    picker.options.innerHTML = '';
+    let visibleCount = 0;
+    players.forEach((player) => {
+      if (query && !player.name.toLocaleLowerCase('sl').includes(query)) return;
+      const groupPlayer = groupPlayerMap.get(String(player.id));
+      const isDuplicate = player.id === otherSelectedId && otherSelectedId > 0;
+      const isSelected = String(player.id) === picker.select.value;
+      const option = document.createElement('button');
+      option.type = 'button';
+      option.className = 'match-picker-option';
+      option.setAttribute('role', 'option');
+      option.setAttribute('aria-selected', String(isSelected));
+      option.classList.toggle('is-selected', isSelected);
+      option.disabled = isDuplicate;
+
+      const avatar = document.createElement('span');
+      avatar.className = 'match-picker-option-avatar';
+      avatar.textContent = player.initials;
+      const copy = document.createElement('span');
+      copy.className = 'match-picker-option-copy';
+      const name = document.createElement('strong');
+      name.textContent = player.name;
+      const meta = document.createElement('small');
+      meta.textContent = groupPlayer
+        ? `${groupPlayer.rank}. mesto · ${groupPlayer.points} ${groupPlayer.points === 1 ? 'točka' : 'točk'}`
+        : `Ni v ligi ${group?.name || ''}`;
+      copy.append(name, meta);
+      option.append(avatar, copy);
+
+      const tag = document.createElement('span');
+      tag.className = 'match-picker-tag';
+      if (isDuplicate) {
+        tag.textContent = 'Izbran';
+        option.appendChild(tag);
+      } else if (picker.number === 2 && firstPlayerId > 0) {
+        const count = group?.history?.[pairKey(firstPlayerId, player.id)] || 0;
+        tag.textContent = count ? `Odigrano ${count}×` : 'Še ni odigrano';
+        tag.classList.toggle('is-unplayed', count === 0);
+        option.appendChild(tag);
+      }
+
+      option.addEventListener('click', () => {
+        picker.select.value = String(player.id);
+        picker.select.dispatchEvent(new Event('change', { bubbles: true }));
+        updateTrigger(picker);
+        closePicker(picker, true);
+        if (picker.number === 1) renderPicker(pickerByNumber(2));
+      });
+      option.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          closePicker(picker, true);
+        }
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+          event.preventDefault();
+          const available = [...picker.options.querySelectorAll('button:not(:disabled)')];
+          const index = available.indexOf(option);
+          const offset = event.key === 'ArrowDown' ? 1 : -1;
+          available[(index + offset + available.length) % available.length]?.focus();
+        }
+      });
+      picker.options.appendChild(option);
+      visibleCount += 1;
+    });
+
+    picker.empty.hidden = visibleCount > 0;
+    picker.groupLabel.textContent = picker.showAll
+      ? `Vsi aktivni igralci · ${visibleCount}`
+      : group ? `${group.name} · ${groupPlayers.length} igralcev` : 'Izberite skupino';
+    picker.showAllButton.textContent = picker.showAll ? 'Pokaži samo igralce iz lige' : 'Pokaži vse igralce';
+  };
+
+  const openPicker = (picker) => {
+    closeAll(picker);
+    picker.popover.hidden = false;
+    picker.element.classList.add('is-open');
+    picker.trigger.setAttribute('aria-expanded', 'true');
+    picker.search.value = '';
+    renderPicker(picker);
+    requestAnimationFrame(() => picker.search.focus());
+  };
+
+  pickers.forEach((picker) => {
+    updateTrigger(picker);
+    picker.trigger.addEventListener('click', () => {
+      if (picker.popover.hidden) openPicker(picker); else closePicker(picker);
+    });
+    picker.trigger.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        openPicker(picker);
+      }
+    });
+    picker.search.addEventListener('input', () => renderPicker(picker));
+    picker.search.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        picker.options.querySelector('button:not(:disabled)')?.focus();
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closePicker(picker, true);
+      }
+    });
+    picker.showAllButton.addEventListener('click', () => {
+      picker.showAll = !picker.showAll;
+      picker.search.value = '';
+      renderPicker(picker);
+      picker.search.focus();
+    });
+  });
+
+  groupSelect.addEventListener('change', () => {
+    pickers.forEach((picker) => {
+      picker.showAll = false;
+      updateTrigger(picker);
+      if (!picker.popover.hidden) renderPicker(picker);
+    });
+  });
+  document.addEventListener('click', (event) => {
+    pickers.forEach((picker) => {
+      if (!picker.element.contains(event.target)) closePicker(picker);
+    });
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') pickers.forEach((picker) => closePicker(picker));
+  });
+});
+

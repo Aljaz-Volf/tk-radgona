@@ -13,6 +13,6 @@
   {% else %}
     <div class="empty-state"><strong>PDF statuta še ni naložen.</strong>Dokument bo na voljo takoj, ko ga klub objavi.</div>
   {% endif %}
-  {% if section and section.body_html %}<article class="card panel article-body admin-section">{{ section.body_html|safe }}</article>{% endif %}
+  {% if section and section.body_html %}<article class="card panel article-body content-copy admin-section">{{ section.body_html|safe }}</article>{% endif %}
 </div></section>
 {% endblock %}

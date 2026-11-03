@@ -1,25 +1,65 @@
 {% extends "admin/base.html" %}
 {% block admin_title %}Liga{% endblock %}
 {% block admin_content %}
-<div class="admin-heading">
-  <div><h1>Liga Radgona</h1><p>Sezone, skupine in točkovanje.</p></div>
+<div class="admin-heading league-admin-heading">
+  <div><h1>Liga Radgona</h1><p>Sezone, lige in točkovanje.</p></div>
   <a class="button" href="{{ url_for('admin.season_form') }}">Nova sezona</a>
 </div>
-<div class="card panel">
-  {% if seasons %}
-    <div class="table-wrap"><table>
-      <thead><tr><th>Sezona</th><th>Obdobje</th><th>Skupine</th><th>Stanje</th><th></th></tr></thead>
-      <tbody>{% for item in seasons %}<tr>
-        <td><strong>{{ item.name }}</strong>{% if item.is_current %} <span class="tag">Aktualna</span>{% endif %}</td>
-        <td>{{ item.starts_on.strftime('%d. %m. %Y') }}–{{ item.ends_on.strftime('%d. %m. %Y') }}</td>
-        <td>{% for group in item.groups %}<a class="table-link" href="{{ url_for('admin.group_form', group_id=group.id) }}">{{ group.name }}</a>{% if not loop.last %}, {% endif %}{% else %}—{% endfor %}</td>
-        <td>{{ 'Objavljena' if item.is_published else 'Skrita' }}</td>
-        <td><div class="actions">
-          <a class="button button-secondary button-small" href="{{ url_for('admin.season_form', season_id=item.id) }}">Uredi</a>
-          <a class="button button-secondary button-small" href="{{ url_for('admin.group_form', season_id=item.id) }}">Dodaj skupino</a>
-        </div></td>
-      </tr>{% endfor %}</tbody>
-    </table></div>
-  {% else %}<div class="empty-state">Sezon še ni.</div>{% endif %}
+
+<div class="card league-seasons-panel">
+  {% if season_rows %}
+    <div class="league-seasons-head" aria-hidden="true">
+      <span>Sezona</span><span>Obdobje</span><span>Lige in igralci</span><span>Stanje</span>
+    </div>
+    <div class="league-season-list">
+      {% for row in season_rows %}
+        {% set item = row.season %}
+        <article class="league-season-row{% if row.is_past %} is-past{% endif %}">
+          <div class="league-season-main">
+            <div class="league-season-name">
+              <strong>{{ item.name }}</strong>
+              {% if item.is_current %}<span class="league-state-chip is-current">Aktualna</span>{% elif row.is_past %}<span class="league-state-chip">Zaključena</span>{% endif %}
+            </div>
+            <div class="league-season-period">{{ item.starts_on.strftime('%d. %m. %Y') }}–{{ item.ends_on.strftime('%d. %m. %Y') }}</div>
+            <div class="league-group-chips">
+              {% for group_row in row.groups %}
+                {% if row.is_past %}
+                  <span>{{ group_row.group.name }} · {{ group_row.player_count }}</span>
+                {% else %}
+                  <a href="{{ url_for('admin.group_form', group_id=group_row.group.id) }}">{{ group_row.group.name }} · {{ group_row.player_count }}</a>
+                {% endif %}
+              {% else %}<em>Lig še ni</em>{% endfor %}
+            </div>
+            <div class="league-season-status">{{ 'V pripravi' if item.setup_pending else 'Objavljena' if item.is_published else 'Skrita' }}</div>
+            {% if row.is_past %}
+              <div class="league-season-actions">
+                <a class="button button-secondary button-small" href="{{ url_for('league.season', slug=item.slug) if item.is_published else url_for('admin.season_form', season_id=item.id) }}">Ogled</a>
+              </div>
+            {% endif %}
+          </div>
+
+          {% if not row.is_past %}
+            <div class="league-season-toolbar{% if row.unassigned_count %} has-unassigned{% endif %}">
+              <p>
+                {% if row.unassigned_count %}<strong>{{ row.unassigned_count }} {{ 'igralec še nima lige' if row.unassigned_count == 1 else 'igralcev še nima lige' }}.</strong> Razvrstite jih, preden objavite urnik.
+                {% else %}Vsi aktivni igralci so razvrščeni.{% endif %}
+              </p>
+              <div class="actions">
+                {% if item.setup_pending %}
+                  <a class="button button-small" href="{{ url_for('admin.season_movements', season_id=item.id) }}">Nadaljuj na premike</a>
+                {% else %}
+                  <a class="button button-small" href="{{ url_for('admin.season_players', season_id=item.id) }}">Razvrsti igralce</a>
+                {% endif %}
+                <a class="button button-secondary button-small" href="{{ url_for('admin.season_form', season_id=item.id) }}">Uredi</a>
+                <a class="button button-secondary button-small" href="{{ url_for('admin.group_form', season_id=item.id) }}">Dodaj ligo</a>
+              </div>
+            </div>
+          {% endif %}
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state">Sezon še ni.</div>
+  {% endif %}
 </div>
 {% endblock %}

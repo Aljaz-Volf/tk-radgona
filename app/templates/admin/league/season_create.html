@@ -1,0 +1,84 @@
+{% extends "admin/base.html" %}
+{% block admin_title %}Nova sezona{% endblock %}
+{% block admin_content %}
+<div class="admin-heading season-create-heading">
+  <div><h1>Nova sezona</h1><p>Pripravite osnovne podatke, lige, igralce in pravila premikov.</p></div>
+  <a class="button button-secondary button-small" href="{{ url_for('admin.seasons') }}">Nazaj</a>
+</div>
+
+<nav class="league-setup-steps season-create-steps" aria-label="Koraki priprave sezone">
+  <span class="is-active" aria-current="step"><b>1</b> Sezona</span><i>→</i>
+  <span><b>2</b> Lige</span><i>→</i>
+  <span><b>3</b> Premiki</span><i>→</i>
+  <span><b>4</b> Objava</span>
+</nav>
+
+<form method="post" class="season-create-form" data-season-create-form>
+  {{ form.hidden_tag() }}
+
+  <section class="card season-create-section">
+    <div class="season-create-section-heading"><div><span>Osnovno</span><p>Ime, obdobje in točkovanje sezone.</p></div></div>
+    <div class="season-basics-grid">
+      {% for field, class_name in [(form.name, 'is-name'), (form.starts_on, ''), (form.ends_on, ''), (form.win_points, ''), (form.loss_points, '')] %}
+        <div class="form-field {{ class_name }}{% if field.errors %} has-error{% endif %}">
+          {{ field.label }}{{ field(class_='input') }}
+          {% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="card season-create-section" data-season-leagues>
+    <div class="season-create-section-heading">
+      <div><span>Lige</span><p>{% if previous_season %}Prenesene iz sezone {{ previous_season.name }}. Preimenujte, razvrstite ali dodajte nove.{% else %}Pripravljen je privzeti ligaški sistem.{% endif %}</p></div>
+      <button class="button button-secondary button-small" type="button" data-reset-leagues>Ponastavi na lani</button>
+    </div>
+    {% if league_error %}<div class="match-score-errors" role="alert"><span>{{ league_error }}</span></div>{% endif %}
+    <div class="season-league-list" data-season-league-list>
+      {% for row in league_rows %}
+        <div class="season-league-row" data-season-league-row>
+          <button class="season-league-handle" type="button" draggable="true" aria-label="Premakni ligo" tabindex="-1">⠿</button>
+          <input type="hidden" name="league_source_group_id" value="{{ row.source_group_id or '' }}">
+          <label><span>Ime lige</span><input class="input" type="text" name="league_name" maxlength="100" value="{{ row.name }}" required></label>
+          <label class="season-league-capacity"><span>Največ</span><input class="input" type="number" name="league_max_players" min="1" max="64" value="{{ row.max_players }}" required><small>igralcev</small></label>
+          <button class="season-league-delete" type="button" data-delete-league aria-label="Izbriši {{ row.name }}">×</button>
+        </div>
+      {% endfor %}
+    </div>
+    <button class="season-add-league" type="button" data-add-league>+ Dodaj ligo</button>
+    <script type="application/json" data-default-leagues>{{ default_leagues|tojson }}</script>
+  </section>
+
+  <section class="card season-create-section">
+    <div class="season-create-section-heading"><div><span>Igralci in premiki</span><p>Pred potrditvijo boste lahko vsak predlagani premik posebej izklopili.</p></div></div>
+    <div class="season-options-list">
+      <label class="season-option-row">
+        {{ form.carry_players() }}
+        <span><strong>{{ form.carry_players.label.text }}</strong><small>Igralci iz izbrisane lige bodo ostali na seznamu »Brez lige«.</small></span>
+      </label>
+      <div class="season-option-row season-promotion-option">
+        {{ form.apply_promotions() }}
+        <span><strong>{{ form.apply_promotions.label.text }}</strong><small>Najboljši napredujejo, zadnji izpadejo; Ženska Liga ostane ločena.</small></span>
+        <label class="season-boundary-count" for="{{ form.promotions_per_boundary.id }}"><span>Na mejo</span>{{ form.promotions_per_boundary(class_='input') }}</label>
+      </div>
+      {% for error in form.promotions_per_boundary.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+    </div>
+  </section>
+
+  <section class="card season-create-section season-publication-section">
+    <div>
+      <span>Objava</span>
+      <p>Nova sezona bo postala aktivna in javna šele po potrditvi premikov.</p>
+    </div>
+    <div class="season-publication-options">
+      <label class="check-field">{{ form.is_current() }}<span>{{ form.is_current.label.text }}</span></label>
+      <label class="check-field">{{ form.is_published() }}<span>{{ form.is_published.label.text }}</span></label>
+    </div>
+  </section>
+
+  <div class="season-create-actions">
+    <a class="button button-secondary" href="{{ url_for('admin.seasons') }}">Prekliči</a>
+    {{ form.submit(class_='button') }}
+  </div>
+</form>
+{% endblock %}

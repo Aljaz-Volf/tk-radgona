@@ -10,7 +10,7 @@
 </div></header>
 
 <article class="narrow article-layout"><div>
-  <div class="article-body">{{ article.body_html|safe }}</div>
+  <div class="article-body content-copy">{{ article.body_html|safe }}</div>
   {% if article.images %}
     <div class="article-photo-gallery{% if article.images|length == 1 %} is-single{% endif %}">
       {% for item in article.images %}

@@ -6,6 +6,7 @@ from wtforms import (
     BooleanField,
     DateField,
     DateTimeLocalField,
+    HiddenField,
     IntegerField,
     PasswordField,
     SelectField,
@@ -81,6 +82,10 @@ class MemberForm(FlaskForm):
     membership_number = StringField("Članska številka", validators=[Optional(), Length(max=40)])
     membership_valid_until = DateField("Članstvo velja do", validators=[Optional()])
     active = BooleanField("Aktiven član", default=True)
+    active_player = BooleanField(
+        "Aktiven igralec",
+        description="Člana dodaj med igralce Lige Radgona.",
+    )
     submit = SubmitField("Shrani člana")
 
 
@@ -109,10 +114,27 @@ class SeasonForm(FlaskForm):
             raise ValidationError("Konec sezone ne more biti pred začetkom.")
 
 
+class SeasonCreateForm(SeasonForm):
+    carry_players = BooleanField("Igralce prenesi v lige, v katerih so igrali lani", default=True)
+    apply_promotions = BooleanField("Predlagaj napredovanja in izpadanja", default=True)
+    promotions_per_boundary = IntegerField(
+        "Igralcev na mejo",
+        validators=[InputRequired(), NumberRange(min=1, max=8)],
+        default=2,
+        render_kw={"min": 1, "max": 8, "step": 1},
+    )
+    submit = SubmitField("Shrani in nadaljuj na premike")
+
+
 class GroupForm(FlaskForm):
-    name = StringField("Ime skupine", validators=[DataRequired(), Length(max=100)])
-    player_ids = SelectMultipleField("Igralci", coerce=int, validators=[Optional()])
-    submit = SubmitField("Shrani skupino")
+    name = StringField("Ime lige", validators=[DataRequired(), Length(max=100)])
+    max_players = IntegerField(
+        "Največ igralcev",
+        validators=[InputRequired(), NumberRange(min=1, max=64)],
+        default=8,
+        render_kw={"min": 1, "max": 64, "step": 1},
+    )
+    submit = SubmitField("Shrani ligo")
 
 
 class MatchForm(FlaskForm):
@@ -130,10 +152,64 @@ class MatchForm(FlaskForm):
 
 
 class MatchResultForm(FlaskForm):
-    score = StringField("Rezultat", validators=[DataRequired(), Length(max=80)], description="Primer: 6-4, 3-6, 10-8")
+    score = HiddenField(validators=[Optional(), Length(max=80)])
+    set1_player1 = IntegerField("1. niz – igralec 1", validators=[Optional(), NumberRange(min=0, max=99)], render_kw={"min": 0, "max": 99, "inputmode": "numeric"})
+    set1_player2 = IntegerField("1. niz – igralec 2", validators=[Optional(), NumberRange(min=0, max=99)], render_kw={"min": 0, "max": 99, "inputmode": "numeric"})
+    set2_player1 = IntegerField("2. niz – igralec 1", validators=[Optional(), NumberRange(min=0, max=99)], render_kw={"min": 0, "max": 99, "inputmode": "numeric"})
+    set2_player2 = IntegerField("2. niz – igralec 2", validators=[Optional(), NumberRange(min=0, max=99)], render_kw={"min": 0, "max": 99, "inputmode": "numeric"})
+    set3_player1 = IntegerField("3. niz – igralec 1", validators=[Optional(), NumberRange(min=0, max=99)], render_kw={"min": 0, "max": 99, "inputmode": "numeric"})
+    set3_player2 = IntegerField("3. niz – igralec 2", validators=[Optional(), NumberRange(min=0, max=99)], render_kw={"min": 0, "max": 99, "inputmode": "numeric"})
     played_at = DateTimeLocalField("Odigrano", validators=[Optional()], format="%Y-%m-%dT%H:%M", default=datetime.now)
     notes = TextAreaField("Opombe", validators=[Optional(), Length(max=3000)])
     submit = SubmitField("Vpiši rezultat")
+
+    def validate(self, extra_validators=None):
+        valid = super().validate(extra_validators=extra_validators)
+        fields = (
+            self.set1_player1,
+            self.set1_player2,
+            self.set2_player1,
+            self.set2_player2,
+            self.set3_player1,
+            self.set3_player2,
+        )
+        has_grid_value = any(field.data is not None for field in fields)
+
+        # Existing integrations can still submit the old score value, while
+        # browser submissions use the structured score grid.
+        if not has_grid_value:
+            if not self.score.data:
+                self.score.errors.append("Vnesite rezultat prvih dveh nizov.")
+                return False
+            return valid
+
+        required = fields[:4]
+        for field in required:
+            if field.data is None:
+                field.errors.append("Vnesite rezultat niza.")
+                valid = False
+
+        third_values = (self.set3_player1.data, self.set3_player2.data)
+        if (third_values[0] is None) != (third_values[1] is None):
+            missing = self.set3_player1 if third_values[0] is None else self.set3_player2
+            missing.errors.append("Vnesite rezultat za oba igralca.")
+            valid = False
+        elif all(value is not None for value in third_values):
+            high, low = max(third_values), min(third_values)
+            if high < 10 or high - low < 2:
+                self.set3_player1.errors.append("Odločilni niz se igra do najmanj 10 točk in na dve točki razlike.")
+                valid = False
+
+        if all(field.data is not None for field in required):
+            parts = [
+                f"{self.set1_player1.data}-{self.set1_player2.data}",
+                f"{self.set2_player1.data}-{self.set2_player2.data}",
+            ]
+            if all(value is not None for value in third_values):
+                parts.append(f"{third_values[0]}-{third_values[1]}")
+            self.score.data = ", ".join(parts)
+
+        return valid
 
 
 class CourtForm(FlaskForm):

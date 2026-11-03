@@ -9,6 +9,19 @@ def utc_now_naive():
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
+def local_today():
+    """Return today's date in the club's configured timezone."""
+    return datetime.now(ZoneInfo(current_app.config["APP_TIMEZONE"])).date()
+
+
+def one_year_after(value):
+    """Return the same calendar date next year, clamping leap day to 28 February."""
+    try:
+        return value.replace(year=value.year + 1)
+    except ValueError:
+        return value.replace(year=value.year + 1, day=28)
+
+
 def local_to_utc(value):
     """Convert a value entered in the club's local time to naive UTC."""
     if value is None:

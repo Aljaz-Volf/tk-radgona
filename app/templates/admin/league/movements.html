@@ -1,0 +1,66 @@
+{% extends "admin/base.html" %}
+{% block admin_title %}Premiki med ligami{% endblock %}
+{% block admin_content %}
+<form method="post" class="league-movements-form" data-movements-form>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="admin-heading movement-heading">
+    <div>
+      <h1>Premiki med ligami</h1>
+      <p>{{ season.name }} · {{ remaining_count }} igralcev ostane, <span data-proposed-count>{{ proposal_count }}</span> jih je predlaganih za premik.</p>
+    </div>
+    <div class="actions">
+      <button class="button button-secondary" type="submit" name="skip_moves" value="1">Pusti vse, kot so</button>
+      <button class="button" type="submit">Potrdi premike (<span data-confirm-count>{{ proposal_count }}</span>)</button>
+    </div>
+  </div>
+
+  <nav class="league-setup-steps movement-steps" aria-label="Koraki priprave sezone">
+    <span class="is-complete"><b>1</b> Sezona</span><i>→</i>
+    <span class="is-complete"><b>2</b> Lige</span><i>→</i>
+    <span class="is-active" aria-current="step"><b>3</b> Premiki</span><i>→</i>
+    <span><b>4</b> Objava</span>
+  </nav>
+
+  {% if boundaries %}
+    <div class="movement-boundary-grid">
+      {% for boundary in boundaries %}
+        <section class="card movement-boundary-card">
+          <h2>{{ boundary.upper.name }} ⇄ {{ boundary.lower.name }}</h2>
+          <div class="movement-direction is-down">
+            <h3>↓ Izpadejo iz {{ boundary.upper.name }}</h3>
+            {% for proposal in boundary.demotions %}
+              <label class="movement-player">
+                <input type="checkbox" name="moves" value="{{ proposal.value }}" checked>
+                <span class="movement-rank">{{ proposal.rank }}.</span>
+                <strong>{{ proposal.membership.player.display_name }}</strong>
+                <small>→ {{ proposal.target.name }}</small>
+              </label>
+            {% else %}<p>Ni dovolj igralcev za predlog.</p>{% endfor %}
+          </div>
+          <div class="movement-direction is-up">
+            <h3>↑ Napredujejo iz {{ boundary.lower.name }}</h3>
+            {% for proposal in boundary.promotions %}
+              <label class="movement-player">
+                <input type="checkbox" name="moves" value="{{ proposal.value }}" checked>
+                <span class="movement-rank">{{ proposal.rank }}.</span>
+                <strong>{{ proposal.membership.player.display_name }}</strong>
+                <small>→ {{ proposal.target.name }}</small>
+              </label>
+            {% else %}<p>Ni dovolj igralcev za predlog.</p>{% endfor %}
+          </div>
+        </section>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state movement-empty"><strong>Predlaganih premikov ni.</strong>Sezona nima ligaških mej ali pa so samodejni premiki izključeni.</div>
+  {% endif %}
+
+  <div class="movement-note-bar">
+    <p>
+      {% if separate_groups %}<strong>{{ separate_groups|map(attribute='name')|join(', ') }}</strong> ostane brez premikov.{% endif %}
+      {% if unassigned_players %} Novi ali nerazvrščeni igralci so na seznamu »Brez lige« ({{ unassigned_players|length }}).{% endif %}
+    </p>
+    <a class="button button-secondary button-small" href="{{ url_for('admin.season_players', season_id=season.id) }}">Razvrsti nove igralce</a>
+  </div>
+</form>
+{% endblock %}

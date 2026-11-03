@@ -1,0 +1,64 @@
+{% extends "admin/base.html" %}
+{% block admin_title %}Razvrščanje igralcev{% endblock %}
+{% block admin_content %}
+<div class="admin-heading league-sort-heading">
+  <div><h1>Razvrščanje igralcev</h1><p>{{ season.name }} · Povlecite igralce v lige ali uporabite predlog.</p></div>
+  <div class="actions">
+    {% if previous_season %}<button class="button button-secondary button-small" type="button" data-league-suggest>Predlagaj iz lestvice {{ previous_season.name }}</button>{% endif %}
+    <button class="button button-small" type="submit" form="league-sort-form">Shrani razvrstitev</button>
+  </div>
+</div>
+
+<nav class="league-setup-steps" aria-label="Koraki priprave sezone">
+  <span class="is-complete"><b>1</b> Sezona</span><i>→</i>
+  <span class="is-complete"><b>2</b> Lige</span><i>→</i>
+  <span class="is-active" aria-current="step"><b>3</b> Igralci</span><i>→</i>
+  <span><b>4</b> Objava</span>
+</nav>
+
+<form id="league-sort-form" method="post" data-league-sorter>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="assignments" value='{{ assignments|tojson }}' data-league-assignments>
+  <script type="application/json" data-league-suggestion>{{ suggestion|tojson }}</script>
+
+  <div class="league-sort-board{% if group_columns and group_columns|length <= 5 %} fits-five-leagues{% endif %}" style="--league-count: {{ group_columns|length }}">
+    <section class="league-sort-column league-unassigned-column" data-league-column data-group-id="" data-group-index="-1" data-capacity="999">
+      <header>
+        <h2>Brez lige</h2>
+        <strong data-column-count>{{ unassigned|length }}</strong>
+      </header>
+      <label class="league-player-search">
+        <span class="sr-only">Išči igralca</span>
+        <input type="search" placeholder="Išči igralca …" data-player-search>
+      </label>
+      <div class="league-player-filters" aria-label="Filter igralcev">
+        <button type="button" class="is-active" data-player-filter="all">Vsi</button>
+        <button type="button" data-player-filter="new">Novi</button>
+        <button type="button" data-player-filter="returning">Vračajoči</button>
+      </div>
+      <div class="league-player-list" data-player-list>
+        {% for row in unassigned %}{% include "admin/league/_player_card.html" %}{% endfor %}
+      </div>
+    </section>
+
+    {% for column in group_columns %}
+      <section class="league-sort-column" data-league-column data-group-id="{{ column.group.id }}" data-group-index="{{ column.group_index }}" data-capacity="{{ column.capacity }}">
+        <header>
+          <h2>{{ column.group.name }}</h2>
+          <strong><span data-column-count>{{ column.players|length }}</span> / {{ column.capacity }}</strong>
+        </header>
+        <div class="league-capacity"><span data-capacity-bar style="width: {{ (column.players|length * 100 / column.capacity)|round }}%"></span></div>
+        <div class="league-player-list" data-player-list>
+          {% for row in column.players %}{% include "admin/league/_player_card.html" %}{% endfor %}
+        </div>
+        <div class="league-drop-zone" data-drop-zone>Spusti igralca sem</div>
+      </section>
+    {% endfor %}
+  </div>
+</form>
+
+<div class="league-sort-mobile-actions">
+  <a class="button button-secondary" href="{{ url_for('admin.seasons') }}">Prekliči</a>
+  <button class="button" type="submit" form="league-sort-form">Shrani razvrstitev</button>
+</div>
+{% endblock %}

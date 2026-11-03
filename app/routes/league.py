@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from flask import Blueprint, render_template
 
 from ..models import Match, Player, Season
-from ..services.standings import ordered_standings
+from ..services.standings import groups_for_display, ordered_standings
 
 
 bp = Blueprint("league", __name__)
@@ -36,7 +36,7 @@ def results():
 @bp.get("/razvrstitve")
 def standings():
     season = _current_season()
-    group_tables = [(group, ordered_standings(group)) for group in season.groups] if season else []
+    group_tables = [(group, ordered_standings(group)) for group in groups_for_display(season.groups)] if season else []
     return render_template("league/standings.html", season=season, group_tables=group_tables)
 
 
@@ -59,7 +59,7 @@ def archive():
 @bp.get("/<slug>")
 def season(slug):
     selected = Season.query.filter_by(slug=slug, is_published=True).first_or_404()
-    group_tables = [(group, ordered_standings(group)) for group in selected.groups]
+    group_tables = [(group, ordered_standings(group)) for group in groups_for_display(selected.groups)]
     upcoming = Match.query.filter_by(season_id=selected.id, status="scheduled").order_by(Match.scheduled_at.asc()).all()
     results = Match.query.filter_by(season_id=selected.id, status="completed").order_by(Match.played_at.desc()).all()
     return render_template("league/season.html", season=selected, group_tables=group_tables, upcoming=upcoming, results=results)

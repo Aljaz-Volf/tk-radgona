@@ -1,2 +1,64 @@
-{% extends "admin/base.html" %}{% from "macros/forms.html" import render_form %}{% block admin_title %}Tekma{% endblock %}{% block admin_content %}<div class="admin-heading"><div><h1>{{ 'Uredi tekmo' if match else 'Nova tekma' }}</h1></div><a class="button button-secondary" href="{{ url_for('admin.matches') }}">Nazaj</a></div><div class="card panel">{{ render_form(form) }}</div>{% endblock %}
+{% extends "admin/base.html" %}
+{% block admin_title %}Tekma{% endblock %}
+{% macro player_picker(field, number, placeholder) %}
+  <div class="form-field match-player-picker-field{% if field.errors %} has-error{% endif %}" data-match-player-picker="{{ number }}">
+    {{ field.label }}
+    {{ field(class_='sr-only', data_match_player_select=number, tabindex='-1') }}
+    <button class="match-player-trigger" type="button" data-player-trigger aria-haspopup="listbox" aria-expanded="false">
+      <span class="match-picker-avatar" data-trigger-avatar hidden></span>
+      <span data-trigger-label>{{ placeholder }}</span>
+      <span class="match-picker-chevron" aria-hidden="true"></span>
+    </button>
+    <div class="match-player-popover" data-player-popover hidden>
+      <label class="match-picker-search">
+        <span aria-hidden="true"></span>
+        <input type="search" placeholder="Išči igralca …" autocomplete="off" data-player-search aria-label="Išči igralca">
+      </label>
+      <div class="match-picker-group-label" data-picker-group-label></div>
+      <div class="match-picker-options" data-player-options role="listbox" aria-label="{{ field.label.text }}"></div>
+      <div class="match-picker-empty" data-player-empty hidden>Ni igralcev, ki ustrezajo iskanju.</div>
+      <button class="match-picker-show-all" type="button" data-show-all-players>Pokaži vse igralce</button>
+    </div>
+    {% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+  </div>
+{% endmacro %}
+{% block admin_content %}
+<div class="admin-heading match-form-heading">
+  <div><h1>{{ 'Uredi tekmo' if match else 'Nova tekma' }}</h1><p>Izberite ligo in igralca. Seznam nasprotnikov se prilagodi izbrani ligi.</p></div>
+  <a class="button button-secondary" href="{{ url_for('admin.matches') }}">Nazaj</a>
+</div>
 
+<form method="post" class="card match-form-card" data-match-form>
+  {{ form.hidden_tag() }}
+  <div class="match-form-context">
+    <div class="form-field{% if form.season_id.errors %} has-error{% endif %}">
+      {{ form.season_id.label }}{{ form.season_id(class_='input', data_match_season=True) }}
+      {% for error in form.season_id.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+    </div>
+    <div class="form-field{% if form.group_id.errors %} has-error{% endif %}">
+      {{ form.group_id.label }}{{ form.group_id(class_='input', data_match_group=True) }}
+      {% for error in form.group_id.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+    </div>
+  </div>
+
+  {{ player_picker(form.player1_id, 1, 'Izberi prvega igralca') }}
+  {{ player_picker(form.player2_id, 2, 'Izberi nasprotnika') }}
+
+  <div class="match-form-details">
+    <div class="form-field{% if form.scheduled_at.errors %} has-error{% endif %}">
+      {{ form.scheduled_at.label }}{{ form.scheduled_at(class_='input') }}
+      {% for error in form.scheduled_at.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+    </div>
+    <div class="form-field{% if form.notes.errors %} has-error{% endif %}">
+      <label for="{{ form.notes.id }}">Opombe <span class="optional-label">(neobvezno)</span></label>
+      {{ form.notes(class_='input', rows='2') }}
+      {% for error in form.notes.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+    </div>
+  </div>
+  <div class="match-form-actions">
+    <a class="button button-secondary" href="{{ url_for('admin.matches') }}">Prekliči</a>
+    {{ form.submit(class_='button') }}
+  </div>
+  <script type="application/json" data-match-player-data>{{ player_picker_data|tojson }}</script>
+</form>
+{% endblock %}

@@ -3,7 +3,7 @@ from io import BytesIO
 from zoneinfo import ZoneInfo
 
 from app.extensions import db
-from app.models import NewsArticle
+from app.models import ClubContent, NewsArticle
 from PIL import Image
 from tests.conftest import login
 
@@ -36,6 +36,46 @@ def test_admin_can_create_and_publish_news(app, client, admin):
     public = client.get("/novice/nova-sezona")
     assert public.status_code == 200
     assert "Nova sezona" in public.get_data(as_text=True)
+
+
+def test_news_and_club_content_preserve_authored_spacing(app, client, admin):
+    body = "Prva vrstica\n\n    Druga vrstica"
+    login(client)
+
+    club_response = client.post(
+        "/admin/vsebina/nova",
+        data={
+            "section_key": "about",
+            "title": "O klubu",
+            "body": body,
+            "is_published": "y",
+        },
+    )
+    news_response = client.post(
+        "/admin/novice/nova",
+        data={
+            "title": "Obvestilo z razmiki",
+            "body": body,
+            "status": "published",
+        },
+    )
+    assert club_response.status_code == 302
+    assert news_response.status_code == 302
+
+    with app.app_context():
+        assert ClubContent.query.filter_by(section_key="about").one().body_html == body
+        assert NewsArticle.query.filter_by(slug="obvestilo-z-razmiki").one().body_html == body
+
+    for url in ("/klub/about", "/novice/obvestilo-z-razmiki"):
+        public = client.get(url)
+        html = public.get_data(as_text=True)
+        assert public.status_code == 200
+        assert 'class="article-body content-copy"' in html
+        assert body in html
+
+    stylesheet = client.get("/static/css/main.css").get_data(as_text=True)
+    assert ".article-body.content-copy" in stylesheet
+    assert "white-space: pre-wrap" in stylesheet
 
 
 def test_news_form_has_current_date_no_category_and_styled_status(client, admin):

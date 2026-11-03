@@ -1,5 +1,8 @@
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 from app.extensions import db
-from app.models import Member
+from app.models import Member, Player
 from tests.conftest import login
 
 
@@ -135,4 +138,67 @@ def test_admin_index_and_management_pages_render(client, admin):
     for url in urls:
         response = client.get(url)
         assert response.status_code == 200, url
+
+
+def test_member_can_be_added_to_and_removed_from_active_players(app, client, admin):
+    login(client)
+
+    create_response = client.post(
+        "/admin/clani/nov",
+        data={
+            "first_name": "Maja",
+            "last_name": "Novak",
+            "membership_number": "TK-20",
+            "active": "y",
+            "active_player": "y",
+        },
+    )
+    assert create_response.status_code == 302
+
+    with app.app_context():
+        member = Member.query.filter_by(membership_number="TK-20").one()
+        member_id = member.id
+        player_id = member.player.id
+        assert member.player.display_name == "Maja Novak"
+        assert member.player.active is True
+
+    players_page = client.get("/admin/igralci").get_data(as_text=True)
+    assert "Maja Novak" in players_page
+    assert "Aktiven" in players_page
+
+    edit_page = client.get(f"/admin/clani/{member_id}/uredi").get_data(as_text=True)
+    assert 'name="active_player"' in edit_page
+    active_player_input = edit_page.split('id="active_player"', 1)[0].rsplit("<input", 1)[1]
+    assert "checked" in active_player_input
+
+    update_response = client.post(
+        f"/admin/clani/{member_id}/uredi",
+        data={
+            "first_name": "Maja",
+            "last_name": "Kovač",
+            "membership_number": "TK-20",
+            "active": "y",
+        },
+    )
+    assert update_response.status_code == 302
+
+    with app.app_context():
+        player = db.session.get(Player, player_id)
+        assert player.display_name == "Maja Kovač"
+        assert player.active is False
+
+
+def test_new_member_defaults_membership_validity_to_one_year_from_today(app, client, admin):
+    login(client)
+    today = datetime.now(ZoneInfo(app.config["APP_TIMEZONE"])).date()
+    try:
+        expected = today.replace(year=today.year + 1)
+    except ValueError:
+        expected = today.replace(year=today.year + 1, day=28)
+
+    page = client.get("/admin/clani/nov")
+    assert page.status_code == 200
+    html = page.get_data(as_text=True)
+    assert f'name="membership_valid_until"' in html
+    assert f'value="{expected.isoformat()}"' in html
 

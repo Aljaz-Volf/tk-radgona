@@ -2,21 +2,51 @@ from ..extensions import db
 from ..models import LeagueMembership, Match, Standing
 
 
+def is_separate_league(group) -> bool:
+    normalized = group.name.casefold()
+    return "žensk" in normalized or "zensk" in normalized or "enska liga" in normalized
+
+
+def group_display_key(group):
+    """Show the separate women's league before the numbered league ladder."""
+    return (0 if is_separate_league(group) else 1, group.sort_order, group.id or 0)
+
+
+def groups_for_display(groups):
+    return sorted(groups, key=group_display_key)
+
+
+def _empty_standing(group_id: int, player_id: int) -> Standing:
+    """Create a row whose counters are usable before the first database flush."""
+    return Standing(
+        group_id=group_id,
+        player_id=player_id,
+        played=0,
+        wins=0,
+        losses=0,
+        points=0,
+        sets_won=0,
+        sets_lost=0,
+        games_won=0,
+        games_lost=0,
+    )
+
+
 def recalculate_group(group) -> list[Standing]:
     Standing.query.filter_by(group_id=group.id).delete()
     rows = {}
     for membership in LeagueMembership.query.filter_by(group_id=group.id).all():
-        row = Standing(group_id=group.id, player_id=membership.player_id)
+        row = _empty_standing(group.id, membership.player_id)
         db.session.add(row)
         rows[membership.player_id] = row
 
     matches = Match.query.filter_by(group_id=group.id, status="completed").all()
     for match in matches:
         if match.player1_id not in rows:
-            rows[match.player1_id] = Standing(group_id=group.id, player_id=match.player1_id)
+            rows[match.player1_id] = _empty_standing(group.id, match.player1_id)
             db.session.add(rows[match.player1_id])
         if match.player2_id not in rows:
-            rows[match.player2_id] = Standing(group_id=group.id, player_id=match.player2_id)
+            rows[match.player2_id] = _empty_standing(group.id, match.player2_id)
             db.session.add(rows[match.player2_id])
         first, second = rows[match.player1_id], rows[match.player2_id]
         first.played += 1

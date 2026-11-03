@@ -7,7 +7,7 @@
   <p>Aktivni člani Teniškega kluba Gornja Radgona.</p>
 </div></header>
 <section class="section"><div class="wrap">
-  {% if section and section.body_html %}<div class="article-body member-directory-intro">{{ section.body_html|safe }}</div>{% endif %}
+  {% if section and section.body_html %}<div class="article-body content-copy member-directory-intro">{{ section.body_html|safe }}</div>{% endif %}
   {% if members %}
     <div class="member-directory">
       {% for member in members %}
