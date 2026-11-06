@@ -1,2 +1,45 @@
-{% extends "admin/base.html" %}{% block admin_title %}Tekme{% endblock %}{% block admin_content %}<div class="admin-heading"><div><h1>Tekme</h1><p>Razpored in uradni rezultati.</p></div><a class="button" href="{{ url_for('admin.match_form') }}">Nova tekma</a></div><div class="card panel">{% if matches %}<div class="table-wrap"><table><thead><tr><th>Termin</th><th>Sezona / skupina</th><th>Tekma</th><th>Rezultat</th><th></th></tr></thead><tbody>{% for match in matches %}<tr><td>{{ match.scheduled_at.strftime('%d. %m. %Y · %H:%M') if match.scheduled_at else 'Ni določen' }}</td><td>{{ match.season.name }} / {{ match.group.name }}</td><td>{{ match.player1.display_name }} — {{ match.player2.display_name }}</td><td>{% if match.status == 'completed' %}<span class="score">{{ match|score }}</span>{% else %}<span class="status status-{{ match.status }}">Na sporedu</span>{% endif %}</td><td><div class="actions"><a class="button button-secondary button-small" href="{{ url_for('admin.match_form', match_id=match.id) }}">Uredi</a><a class="button button-small" href="{{ url_for('admin.match_result', match_id=match.id) }}">Rezultat</a></div></td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state">Tekem še ni.</div>{% endif %}</div>{% endblock %}
+{% extends "admin/base.html" %}
+{% block admin_title %}Tekme{% endblock %}
+{% block admin_content %}
+<div class="admin-heading">
+  <div><h1>Tekme</h1><p>Razpored in uradni rezultati.</p></div>
+  <div class="actions">
+    <a class="button button-secondary" href="{{ url_for('admin.fixture_generator') }}">Generiraj razpored</a>
+    <a class="button" href="{{ url_for('admin.match_form') }}">Nova tekma</a>
+  </div>
+</div>
 
+<form class="card match-list-filters" method="get">
+  <label><span>Sezona</span><select class="input" name="season_id">
+    <option value="">Vse sezone</option>
+    {% for season in seasons %}<option value="{{ season.id }}"{{ ' selected' if selected_season_id == season.id else '' }}>{{ season.name }}</option>{% endfor %}
+  </select></label>
+  <label><span>Liga</span><select class="input" name="group_id">
+    <option value="">Vse lige</option>
+    {% for group in groups %}<option value="{{ group.id }}" data-season-id="{{ group.season_id }}"{{ ' selected' if selected_group_id == group.id else '' }}>{{ group.season.name }} — {{ group.name }}</option>{% endfor %}
+  </select></label>
+  <label><span>Status</span><select class="input" name="status">
+    <option value="">Vse · odigrane · neodigrane</option>
+    <option value="scheduled"{{ ' selected' if selected_status == 'scheduled' else '' }}>Neodigrane</option>
+    <option value="completed"{{ ' selected' if selected_status == 'completed' else '' }}>Odigrane</option>
+    <option value="cancelled"{{ ' selected' if selected_status == 'cancelled' else '' }}>Odpovedane</option>
+    <option value="walkover"{{ ' selected' if selected_status == 'walkover' else '' }}>Predaja</option>
+  </select></label>
+  <button class="button button-secondary button-small" type="submit">Filtriraj</button>
+</form>
+
+<div class="card panel">
+  {% if matches %}
+  <div class="table-wrap"><table><thead><tr><th>Krog</th><th>Termin</th><th>Skupina</th><th>Domači — gost</th><th>Rezultat</th><th></th></tr></thead><tbody>
+    {% for match in matches %}<tr>
+      <td>{% if match.round_number %}<span class="round-badge">{{ match.round_number }}</span>{% else %}—{% endif %}</td>
+      <td>{{ match.scheduled_at.strftime('%d. %m. %Y · %H:%M') if match.scheduled_at else 'Ni določen' }}</td>
+      <td>{{ match.group.name }}</td>
+      <td><strong>{{ match.player1.display_name }} — {{ match.player2.display_name }}</strong></td>
+      <td>{% if match.status == 'completed' %}<span class="score">{{ match|score }}</span>{% else %}<span class="status status-{{ match.status }}">Neodigrano</span>{% endif %}</td>
+      <td><div class="actions"><a class="button button-secondary button-small" href="{{ url_for('admin.match_form', match_id=match.id) }}">Uredi</a><a class="button button-small" href="{{ url_for('admin.match_result', match_id=match.id) }}">{{ 'Rezultat' if match.status == 'completed' else 'Vpiši' }}</a></div></td>
+    </tr>{% endfor %}
+  </tbody></table></div>
+  {% else %}<div class="empty-state">Ni tekem, ki bi ustrezale izbranim filtrom.</div>{% endif %}
+</div>
+{% endblock %}

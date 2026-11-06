@@ -1,8 +1,9 @@
 import json
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timedelta, timezone
 
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user
+from sqlalchemy.exc import IntegrityError
 
 from ..extensions import db
 from ..forms import (
@@ -48,6 +49,7 @@ from ..models import (
 )
 from ..services.audit import record
 from ..services.content import sanitize_rich_text, unique_slug
+from ..services.fixtures import Fixture, Round, generate_round_robin, validate_round_robin
 from ..services.scoring import parse_score
 from ..services.standings import (
     group_display_key,
@@ -946,7 +948,14 @@ def _match_form(match=None):
         groups_by_season.setdefault(item.season_id, []).append(item)
     for season_groups in groups_by_season.values():
         display_groups.extend(groups_for_display(season_groups))
-    form.group_id.choices = [(item.id, f"{item.season.name} — {item.name}") for item in display_groups]
+    form.group_id.choices = [
+        (
+            item.id,
+            f"{item.season.name} — {item.name}",
+            {"data-season-id": str(item.season_id)},
+        )
+        for item in display_groups
+    ]
     players = Player.query.filter_by(active=True).order_by(Player.display_name).all()
     if match:
         for player in (match.player1, match.player2):
@@ -1029,6 +1038,7 @@ def _match_player_picker_data(match=None):
             "id": group.id,
             "name": group.name,
             "season": group.season.name,
+            "season_id": group.season_id,
             "players": group_players,
             "history": history,
         }
@@ -1037,7 +1047,356 @@ def _match_player_picker_data(match=None):
 
 @bp.get("/tekme")
 def matches():
-    return render_template("admin/league/matches.html", matches=Match.query.order_by(Match.scheduled_at.desc()).all())
+    seasons = Season.query.order_by(Season.starts_on.desc()).all()
+    selected_season_id = request.args.get("season_id", type=int)
+    selected_group_id = request.args.get("group_id", type=int)
+    selected_status = request.args.get("status", "")
+    query = Match.query
+    if selected_season_id:
+        query = query.filter(Match.season_id == selected_season_id)
+    if selected_group_id:
+        query = query.filter(Match.group_id == selected_group_id)
+    if selected_status in {"scheduled", "completed", "cancelled", "walkover"}:
+        query = query.filter(Match.status == selected_status)
+    items = query.order_by(Match.scheduled_at.desc(), Match.id.desc()).all()
+    groups = []
+    for season in seasons:
+        groups.extend(groups_for_display(season.groups))
+    return render_template(
+        "admin/league/matches.html",
+        matches=items,
+        seasons=seasons,
+        groups=groups,
+        selected_season_id=selected_season_id,
+        selected_group_id=selected_group_id,
+        selected_status=selected_status,
+    )
+
+
+def _fixture_group_players(group):
+    memberships = sorted(
+        group.memberships,
+        key=lambda item: (
+            item.seed is None,
+            item.seed or 0,
+            item.player_id,
+        ),
+    )
+    return [membership.player for membership in memberships]
+
+
+def _fixture_group_rows(season):
+    rows = []
+    for group in groups_for_display(season.groups):
+        player_count = len(group.memberships)
+        padded_count = player_count + (player_count % 2)
+        rounds = 2 * max(0, padded_count - 1)
+        matches = player_count * max(0, player_count - 1)
+        existing_count = Match.query.filter_by(
+            season_id=season.id, group_id=group.id
+        ).count()
+        rows.append(
+            {
+                "group": group,
+                "player_count": player_count,
+                "round_count": rounds,
+                "match_count": matches,
+                "existing_count": existing_count,
+            }
+        )
+    return rows
+
+
+def _parse_fixture_options(source):
+    def source_list(name):
+        if hasattr(source, "getlist"):
+            return source.getlist(name)
+        return source.get(name, [])
+
+    try:
+        season_id = int(source.get("season_id"))
+        group_ids = [int(value) for value in source_list("group_ids")]
+        replace_ids = [int(value) for value in source_list("replace_unplayed_group_ids")]
+        start_on = date.fromisoformat(source.get("start_date"))
+        first_at = time.fromisoformat(source.get("first_time", "18:00"))
+        days_between = int(source.get("days_between_rounds", 7))
+    except (TypeError, ValueError):
+        raise ValueError("Vnesite veljavne nastavitve razporeda.") from None
+    if not group_ids:
+        raise ValueError("Izberite vsaj eno ligo.")
+    if days_between < 1 or days_between > 365:
+        raise ValueError("Razmik med krogi mora biti med 1 in 365 dni.")
+    return season_id, group_ids, set(replace_ids), start_on, first_at, days_between
+
+
+def _build_fixture_preview(source):
+    season_id, group_ids, replace_ids, start_on, first_at, days_between = (
+        _parse_fixture_options(source)
+    )
+    season = db.session.get(Season, season_id)
+    if not season:
+        raise ValueError("Izbrana sezona ne obstaja.")
+    if len(group_ids) != len(set(group_ids)):
+        raise ValueError("Liga je bila izbrana več kot enkrat.")
+
+    selected_groups = (
+        LeagueGroup.query.filter(
+            LeagueGroup.season_id == season.id, LeagueGroup.id.in_(group_ids)
+        ).all()
+    )
+    if len(selected_groups) != len(group_ids):
+        raise ValueError("Vse izbrane lige morajo pripadati izbrani sezoni.")
+    order = {group_id: index for index, group_id in enumerate(group_ids)}
+    selected_groups.sort(key=lambda group: order[group.id])
+
+    payload = {
+        "season_id": season.id,
+        "season_name": season.name,
+        "replace_unplayed_group_ids": sorted(replace_ids),
+        "groups": [],
+    }
+    for group in selected_groups:
+        existing_count = Match.query.filter_by(
+            season_id=season.id, group_id=group.id
+        ).count()
+        if existing_count and group.id not in replace_ids:
+            raise ValueError(
+                f"Liga {group.name} že ima tekme. Izrecno potrdite zamenjavo neodigranih tekem."
+            )
+        players = _fixture_group_players(group)
+        generated_rounds = generate_round_robin(player.id for player in players)
+        names = {player.id: player.display_name for player in players}
+        round_rows = []
+        for round_item in generated_rounds:
+            round_date = start_on + timedelta(
+                days=(round_item.round_number - 1) * days_between
+            )
+            matches = []
+            for slot, fixture in enumerate(round_item.matches):
+                scheduled = datetime.combine(round_date, first_at) + timedelta(hours=slot)
+                matches.append(
+                    {
+                        "home_player_id": fixture.home_player_id,
+                        "guest_player_id": fixture.guest_player_id,
+                        "home_name": names[fixture.home_player_id],
+                        "guest_name": names[fixture.guest_player_id],
+                        "scheduled_at": scheduled.isoformat(timespec="minutes"),
+                    }
+                )
+            round_rows.append(
+                {
+                    "round_number": round_item.round_number,
+                    "leg": round_item.leg,
+                    "date": round_date.isoformat(),
+                    "matches": matches,
+                }
+            )
+        validation = validate_round_robin(
+            [player.id for player in players], generated_rounds
+        )
+        payload["groups"].append(
+            {
+                "group_id": group.id,
+                "group_name": group.name,
+                "players": [
+                    {"id": player.id, "name": player.display_name}
+                    for player in players
+                ],
+                "rounds": round_rows,
+                "checks": dict(validation.checks),
+            }
+        )
+    return payload
+
+
+def _rounds_from_payload(group_payload):
+    rounds = []
+    for round_data in group_payload.get("rounds", []):
+        try:
+            round_number = int(round_data["round_number"])
+            leg = int(round_data["leg"])
+            fixtures = tuple(
+                Fixture(
+                    int(match["home_player_id"]),
+                    int(match["guest_player_id"]),
+                )
+                for match in round_data.get("matches", [])
+            )
+        except (KeyError, TypeError, ValueError):
+            raise ValueError("Predogled vsebuje neveljavne podatke o tekmi.") from None
+        if round_number < 1 or leg not in (1, 2):
+            raise ValueError("Številka kroga ali dela sezone ni veljavna.")
+        rounds.append(Round(round_number, leg, fixtures))
+    return rounds
+
+
+def _validate_fixture_payload(payload):
+    try:
+        season_id = int(payload["season_id"])
+        group_payloads = payload["groups"]
+        replace_ids = {
+            int(value) for value in payload.get("replace_unplayed_group_ids", [])
+        }
+    except (KeyError, TypeError, ValueError):
+        raise ValueError("Podatki predogleda niso veljavni.") from None
+    season = db.session.get(Season, season_id)
+    if not season or not isinstance(group_payloads, list) or not group_payloads:
+        raise ValueError("Sezona ali lige v predogledu niso veljavne.")
+
+    validated = []
+    seen_groups = set()
+    for group_payload in group_payloads:
+        try:
+            group_id = int(group_payload["group_id"])
+        except (KeyError, TypeError, ValueError):
+            raise ValueError("Liga v predogledu ni veljavna.") from None
+        if group_id in seen_groups:
+            raise ValueError("Liga se v predogledu ne sme ponoviti.")
+        seen_groups.add(group_id)
+        group = db.session.get(LeagueGroup, group_id)
+        if not group or group.season_id != season.id:
+            raise ValueError("Liga ne pripada izbrani sezoni.")
+        player_ids = [player.id for player in _fixture_group_players(group)]
+        rounds = _rounds_from_payload(group_payload)
+        validation = validate_round_robin(player_ids, rounds)
+        if validation.errors:
+            raise ValueError(" ".join(validation.errors))
+        for round_data in group_payload.get("rounds", []):
+            for match_data in round_data.get("matches", []):
+                try:
+                    datetime.fromisoformat(match_data["scheduled_at"])
+                except (KeyError, TypeError, ValueError):
+                    raise ValueError("Vsaka tekma mora imeti veljaven termin.") from None
+        existing_count = Match.query.filter_by(
+            season_id=season.id, group_id=group.id
+        ).count()
+        if existing_count and group.id not in replace_ids:
+            raise ValueError(
+                f"Liga {group.name} že ima tekme; zamenjava neodigranih ni potrjena."
+            )
+        validated.append((group, group_payload, rounds, validation))
+    return season, replace_ids, validated
+
+
+def _save_fixture_payload(payload):
+    season, replace_ids, validated = _validate_fixture_payload(payload)
+    saved_count = 0
+    warnings = []
+    try:
+        for group, group_payload, rounds, validation in validated:
+            if validation.warnings:
+                warnings.extend(f"{group.name}: {item}" for item in validation.warnings)
+            preserved_pairs = {
+                (match.player1_id, match.player2_id)
+                for match in Match.query.filter(
+                    Match.season_id == season.id,
+                    Match.group_id == group.id,
+                    Match.status.in_(("completed", "walkover")),
+                ).all()
+            }
+            if group.id in replace_ids:
+                Match.query.filter(
+                    Match.season_id == season.id,
+                    Match.group_id == group.id,
+                    Match.status.notin_(("completed", "walkover")),
+                ).delete(synchronize_session=False)
+
+            for round_data, round_item in zip(group_payload["rounds"], rounds):
+                for match_data, fixture in zip(round_data.get("matches", []), round_item.matches):
+                    pair = (fixture.home_player_id, fixture.guest_player_id)
+                    if pair in preserved_pairs:
+                        continue
+                    scheduled_local = datetime.fromisoformat(match_data["scheduled_at"])
+                    db.session.add(
+                        Match(
+                            season_id=season.id,
+                            group_id=group.id,
+                            player1_id=fixture.home_player_id,
+                            player2_id=fixture.guest_player_id,
+                            round_number=round_item.round_number,
+                            leg=round_item.leg,
+                            generated=True,
+                            # Match templates and the existing manual form use
+                            # club-local naive datetimes for scheduled times.
+                            scheduled_at=scheduled_local,
+                            status="scheduled",
+                        )
+                    )
+                    saved_count += 1
+            db.session.flush()
+            record(
+                "fixtures.generate",
+                group,
+                {"season_id": season.id, "matches": saved_count},
+            )
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        raise ValueError(
+            "Razporeda ni mogoče shraniti, ker ena od tekem že obstaja."
+        ) from None
+    return saved_count, warnings
+
+
+@bp.get("/tekme/generiraj")
+def fixture_generator():
+    seasons = Season.query.order_by(Season.starts_on.desc()).all()
+    selected_id = request.args.get("season_id", type=int)
+    selected = db.session.get(Season, selected_id) if selected_id else None
+    if not selected:
+        selected = next((season for season in seasons if season.is_current), None)
+    if not selected and seasons:
+        selected = seasons[0]
+    default_start = max(local_today(), selected.starts_on) if selected else local_today()
+    return render_template(
+        "admin/league/fixture_generator.html",
+        seasons=seasons,
+        selected_season=selected,
+        group_rows=_fixture_group_rows(selected) if selected else [],
+        default_start=default_start,
+    )
+
+
+@bp.post("/tekme/razpored/predogled")
+def fixture_preview():
+    try:
+        payload = _build_fixture_preview(request.form)
+    except ValueError as error:
+        flash(str(error), "error")
+        season_id = request.form.get("season_id", type=int)
+        return redirect(url_for("admin.fixture_generator", season_id=season_id))
+    return render_template("admin/league/fixture_preview.html", payload=payload)
+
+
+@bp.post("/tekme/razpored/shrani")
+def fixture_save():
+    try:
+        payload = json.loads(request.form.get("schedule_payload", ""))
+        saved_count, warnings = _save_fixture_payload(payload)
+    except (json.JSONDecodeError, ValueError) as error:
+        flash(str(error) or "Predogled ni veljaven.", "error")
+        return redirect(url_for("admin.fixture_generator"))
+    flash(f"Razpored je shranjen ({saved_count} tekem).", "success")
+    for warning in warnings:
+        flash(warning, "info")
+    return redirect(url_for("admin.matches", season_id=payload["season_id"]))
+
+
+@bp.post("/api/tekme/razpored/predogled")
+def fixture_preview_api():
+    try:
+        return jsonify(_build_fixture_preview(request.get_json(silent=True) or {}))
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+
+
+@bp.post("/api/tekme/razpored/shrani")
+def fixture_save_api():
+    try:
+        count, warnings = _save_fixture_payload(request.get_json(silent=True) or {})
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+    return jsonify({"saved": count, "warnings": warnings}), 201
 
 
 @bp.route("/tekme/nova", methods=["GET", "POST"])
@@ -1047,23 +1406,124 @@ def match_form(match_id=None):
     form = _match_form(match)
     if form.validate_on_submit():
         group = db.session.get(LeagueGroup, form.group_id.data)
+        membership_ids = {
+            membership.player_id for membership in group.memberships
+        } if group else set()
         if not group or group.season_id != form.season_id.data:
             form.group_id.errors.append("Skupina ne pripada izbrani sezoni.")
+        elif (
+            form.player1_id.data not in membership_ids
+            or form.player2_id.data not in membership_ids
+        ):
+            form.player2_id.errors.append("Oba igralca morata pripadati izbrani ligi.")
+        elif Match.query.filter(
+            Match.season_id == form.season_id.data,
+            Match.group_id == form.group_id.data,
+            Match.player1_id == form.player1_id.data,
+            Match.player2_id == form.player2_id.data,
+            Match.id != (match.id if match else 0),
+        ).first():
+            form.player2_id.errors.append("Ta domača/gostujoča tekma že obstaja.")
         else:
             match = match or Match(status="scheduled")
             form.populate_obj(match)
             db.session.add(match)
-            db.session.flush()
-            record("match.update" if match_id else "match.create", match)
-            db.session.commit()
-            flash("Tekma je shranjena.", "success")
-            return redirect(url_for("admin.matches"))
+            try:
+                db.session.flush()
+                schedule_warnings = _group_schedule_warnings(group)
+                record("match.update" if match_id else "match.create", match)
+                db.session.commit()
+            except IntegrityError:
+                db.session.rollback()
+                form.player2_id.errors.append("Ta domača/gostujoča tekma že obstaja.")
+            else:
+                flash("Tekma je shranjena.", "success")
+                for warning in schedule_warnings:
+                    flash(warning, "info")
+                return redirect(url_for("admin.matches"))
     return render_template(
         "admin/league/match_form.html",
         form=form,
         match=match,
         player_picker_data=_match_player_picker_data(match),
     )
+
+
+def _group_schedule_warnings(group):
+    round_groups = {}
+    for item in group.matches:
+        if item.round_number is None or item.leg not in (1, 2):
+            continue
+        key = (item.round_number, item.leg)
+        round_groups.setdefault(key, []).append(
+            Fixture(item.player1_id, item.player2_id)
+        )
+    if not round_groups:
+        return []
+    rounds = [
+        Round(number, leg, tuple(matches))
+        for (number, leg), matches in sorted(round_groups.items())
+    ]
+    validation = validate_round_robin(
+        [membership.player_id for membership in group.memberships], rounds
+    )
+    return list(validation.warnings)
+
+
+@bp.patch("/api/tekme/<int:match_id>")
+def match_edit_api(match_id):
+    match = db.get_or_404(Match, match_id)
+    data = request.get_json(silent=True) or {}
+    try:
+        group_id = int(data.get("group_id", match.group_id))
+        home_id = int(data.get("home_player_id", match.player1_id))
+        guest_id = int(data.get("guest_player_id", match.player2_id))
+        round_number = data.get("round_number", match.round_number)
+        round_number = int(round_number) if round_number is not None else None
+        leg = data.get("leg", match.leg)
+        leg = int(leg) if leg is not None else None
+    except (TypeError, ValueError):
+        return jsonify({"error": "Podatki tekme niso veljavni."}), 400
+    group = db.session.get(LeagueGroup, group_id)
+    if not group or group.season_id != match.season_id:
+        return jsonify({"error": "Liga ne pripada sezoni tekme."}), 400
+    membership_ids = {item.player_id for item in group.memberships}
+    if home_id == guest_id:
+        return jsonify({"error": "Igralec ne more igrati sam proti sebi."}), 400
+    if home_id not in membership_ids or guest_id not in membership_ids:
+        return jsonify({"error": "Oba igralca morata pripadati izbrani ligi."}), 400
+    duplicate = Match.query.filter(
+        Match.season_id == match.season_id,
+        Match.group_id == group.id,
+        Match.player1_id == home_id,
+        Match.player2_id == guest_id,
+        Match.id != match.id,
+    ).first()
+    if duplicate:
+        return jsonify({"error": "Ta domača/gostujoča tekma že obstaja."}), 409
+    if round_number is not None and round_number < 1:
+        return jsonify({"error": "Krog mora biti pozitivno število."}), 400
+    if leg not in (None, 1, 2):
+        return jsonify({"error": "Del sezone mora biti 1 ali 2."}), 400
+    match.group_id = group.id
+    match.player1_id = home_id
+    match.player2_id = guest_id
+    match.round_number = round_number
+    match.leg = leg
+    if "scheduled_at" in data:
+        try:
+            match.scheduled_at = datetime.fromisoformat(data["scheduled_at"])
+        except (TypeError, ValueError):
+            return jsonify({"error": "Termin ni veljaven."}), 400
+    try:
+        db.session.flush()
+        schedule_warnings = _group_schedule_warnings(group)
+        record("match.update", match)
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({"error": "Ta domača/gostujoča tekma že obstaja."}), 409
+    return jsonify({"id": match.id, "updated": True, "warnings": schedule_warnings})
 
 
 @bp.route("/tekme/<int:match_id>/rezultat", methods=["GET", "POST"])

@@ -1,0 +1,47 @@
+{% extends "admin/base.html" %}
+{% block admin_title %}Predogled razporeda{% endblock %}
+{% block admin_content %}
+<div class="admin-heading fixture-heading">
+  <div><h1>Predogled razporeda</h1><p>Sezona {{ payload.season_name }} · nič še ni shranjeno. Zamenjajte domačina ali spremenite termin, nato potrdite.</p></div>
+  <div class="actions"><a class="button button-secondary" href="{{ url_for('admin.fixture_generator', season_id=payload.season_id) }}">Nazaj</a><button class="button" type="submit" form="fixture-save">Shrani razpored</button></div>
+</div>
+
+<form id="fixture-save" method="post" action="{{ url_for('admin.fixture_save') }}" data-fixture-preview>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <textarea name="schedule_payload" data-schedule-payload hidden>{{ payload|tojson }}</textarea>
+  <nav class="fixture-tabs" aria-label="Lige">
+    {% for group in payload.groups %}<button type="button" class="{{ 'is-active' if loop.first else '' }}" data-fixture-tab="{{ group.group_id }}">{{ group.group_name }}</button>{% endfor %}
+  </nav>
+
+  {% for group in payload.groups %}
+  <section class="fixture-preview-group{{ ' is-active' if loop.first else '' }}" data-fixture-group="{{ group.group_id }}">
+    <div class="fixture-rounds">
+      {% for round in group.rounds %}
+      <article class="card fixture-round" data-fixture-round data-round-number="{{ round.round_number }}" data-leg="{{ round.leg }}">
+        <div class="fixture-round-head"><h2>Krog {{ round.round_number }}</h2><span>{{ round.leg }}. del{{ ' · zrcalno' if round.leg == 2 else '' }}</span></div>
+        <input class="input fixture-round-date" type="date" value="{{ round.date }}" aria-label="Datum {{ round.round_number }}. kroga" data-round-date>
+        <div class="fixture-match-list">
+          {% for match in round.matches %}
+          <div class="fixture-match" data-fixture-match data-home-id="{{ match.home_player_id }}" data-guest-id="{{ match.guest_player_id }}">
+            <div class="fixture-pair"><strong data-home-name>{{ match.home_name }}</strong><span>—</span><strong data-guest-name>{{ match.guest_name }}</strong></div>
+            <input type="datetime-local" class="input fixture-match-time" value="{{ match.scheduled_at }}" aria-label="Termin tekme" data-match-time>
+            <button type="button" class="fixture-icon-button" title="Zamenjaj domačina in gosta" aria-label="Zamenjaj domačina in gosta" data-swap-fixture>⇄</button>
+            <button type="button" class="fixture-icon-button" title="Odstrani tekmo" aria-label="Odstrani tekmo" data-delete-fixture>×</button>
+          </div>
+          {% endfor %}
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    <aside class="card fixture-validation" data-fixture-validation>
+      <h2>Preverjanje</h2>
+      <p data-check="pairs_twice">Vsak par igra 2×</p>
+      <p data-check="balanced">Domače in gostujoče tekme so uravnotežene</p>
+      <p data-check="no_self_play">Nihče ne igra sam proti sebi</p>
+      <p data-check="one_match_per_round">Noben igralec ne igra 2× v istem krogu</p>
+      <small>Odstopanja pri popolnosti in ravnotežju so opozorila. Igralec iz druge lige ali igra proti sebi sta vedno blokirana.</small>
+    </aside>
+  </section>
+  {% endfor %}
+</form>
+{% endblock %}

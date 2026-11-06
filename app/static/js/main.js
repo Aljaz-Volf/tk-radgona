@@ -977,6 +977,7 @@ document.querySelectorAll('[data-movements-form]').forEach((form) => {
 
 document.querySelectorAll('[data-match-form]').forEach((form) => {
   const data = JSON.parse(form.querySelector('[data-match-player-data]').textContent);
+  const seasonSelect = form.querySelector('[data-match-season]');
   const groupSelect = form.querySelector('[data-match-group]');
   const pickers = [...form.querySelectorAll('[data-match-player-picker]')].map((element) => ({
     element,
@@ -1145,13 +1146,33 @@ document.querySelectorAll('[data-match-form]').forEach((form) => {
     });
   });
 
-  groupSelect.addEventListener('change', () => {
+  const filterGroupsForSeason = () => {
+    const seasonId = Number(seasonSelect.value);
+    const options = [...groupSelect.options];
+    options.forEach((option) => {
+      const group = data.groups[String(option.value)];
+      const visible = group && Number(group.season_id) === seasonId;
+      option.hidden = !visible;
+      option.disabled = !visible;
+    });
+    if (groupSelect.selectedOptions[0]?.disabled) {
+      const first = options.find((option) => !option.disabled);
+      if (first) groupSelect.value = first.value;
+    }
+  };
+  const refreshPickers = () => {
     pickers.forEach((picker) => {
       picker.showAll = false;
       updateTrigger(picker);
       if (!picker.popover.hidden) renderPicker(picker);
     });
+  };
+  seasonSelect.addEventListener('change', () => {
+    filterGroupsForSeason();
+    refreshPickers();
   });
+  groupSelect.addEventListener('change', refreshPickers);
+  filterGroupsForSeason();
   document.addEventListener('click', (event) => {
     pickers.forEach((picker) => {
       if (!picker.element.contains(event.target)) closePicker(picker);
@@ -1160,5 +1181,127 @@ document.querySelectorAll('[data-match-form]').forEach((form) => {
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') pickers.forEach((picker) => closePicker(picker));
   });
+});
+
+document.querySelectorAll('[data-fixture-generator]').forEach((form) => {
+  const season = form.querySelector('[data-fixture-season]');
+  const start = form.querySelector('[data-fixture-start]');
+  const weekday = form.querySelector('[data-fixture-weekday]');
+  const weekdays = ['Nedelja', 'Ponedeljek', 'Torek', 'Sreda', 'Četrtek', 'Petek', 'Sobota'];
+  const updateWeekday = () => {
+    const value = start.value ? new Date(`${start.value}T12:00:00`) : null;
+    weekday.textContent = value && !Number.isNaN(value.getTime()) ? weekdays[value.getDay()] : '—';
+  };
+  season.addEventListener('change', () => {
+    window.location.assign(`${window.location.pathname}?season_id=${encodeURIComponent(season.value)}`);
+  });
+  start.addEventListener('change', updateWeekday);
+  updateWeekday();
+
+  form.querySelectorAll('.fixture-league-row.has-existing').forEach((row) => {
+    const group = row.querySelector('input[name="group_ids"]');
+    const replace = row.querySelector('input[name="replace_unplayed_group_ids"]');
+    if (!group || !replace) return;
+    replace.addEventListener('change', () => { if (replace.checked) group.checked = true; });
+    group.addEventListener('change', () => { if (!group.checked) replace.checked = false; });
+  });
+});
+
+document.querySelectorAll('[data-fixture-preview]').forEach((form) => {
+  const payloadField = form.querySelector('[data-schedule-payload]');
+  const payload = JSON.parse(payloadField.value);
+  const groupById = new Map(payload.groups.map((group) => [String(group.group_id), group]));
+
+  form.querySelectorAll('[data-fixture-tab]').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      form.querySelectorAll('[data-fixture-tab]').forEach((item) => item.classList.toggle('is-active', item === tab));
+      form.querySelectorAll('[data-fixture-group]').forEach((group) => group.classList.toggle('is-active', group.dataset.fixtureGroup === tab.dataset.fixtureTab));
+    });
+  });
+
+  const syncGroup = (groupElement) => {
+    const group = groupById.get(groupElement.dataset.fixtureGroup);
+    const names = new Map(group.players.map((player) => [String(player.id), player.name]));
+    group.rounds = [...groupElement.querySelectorAll('[data-fixture-round]')].map((roundElement) => ({
+      round_number: Number(roundElement.dataset.roundNumber),
+      leg: Number(roundElement.dataset.leg),
+      date: roundElement.querySelector('[data-round-date]').value,
+      matches: [...roundElement.querySelectorAll('[data-fixture-match]')].map((matchElement) => ({
+        home_player_id: Number(matchElement.dataset.homeId),
+        guest_player_id: Number(matchElement.dataset.guestId),
+        home_name: names.get(matchElement.dataset.homeId),
+        guest_name: names.get(matchElement.dataset.guestId),
+        scheduled_at: matchElement.querySelector('[data-match-time]').value,
+      })),
+    }));
+
+    const playerIds = group.players.map((player) => Number(player.id));
+    const expectedPairs = playerIds.length * (playerIds.length - 1) / 2;
+    const unordered = new Map();
+    const ordered = new Map();
+    const homes = new Map(playerIds.map((id) => [id, [0, 0]]));
+    const guests = new Map(playerIds.map((id) => [id, [0, 0]]));
+    let noSelf = true;
+    let onePerRound = true;
+    group.rounds.forEach((round) => {
+      const seen = new Map();
+      round.matches.forEach((match) => {
+        noSelf = noSelf && match.home_player_id !== match.guest_player_id;
+        [match.home_player_id, match.guest_player_id].forEach((id) => seen.set(id, (seen.get(id) || 0) + 1));
+        const pair = [match.home_player_id, match.guest_player_id].sort((a, b) => a - b).join(':');
+        const direction = `${match.home_player_id}:${match.guest_player_id}`;
+        unordered.set(pair, (unordered.get(pair) || 0) + 1);
+        ordered.set(direction, (ordered.get(direction) || 0) + 1);
+        if (homes.has(match.home_player_id) && round.leg >= 1 && round.leg <= 2) homes.get(match.home_player_id)[round.leg - 1] += 1;
+        if (guests.has(match.guest_player_id) && round.leg >= 1 && round.leg <= 2) guests.get(match.guest_player_id)[round.leg - 1] += 1;
+      });
+      if ([...seen.values()].some((count) => count > 1)) onePerRound = false;
+    });
+    const pairsTwice = unordered.size === expectedPairs && [...unordered.entries()].every(([pair, count]) => {
+      const [first, second] = pair.split(':');
+      return count === 2 && ordered.get(`${first}:${second}`) === 1 && ordered.get(`${second}:${first}`) === 1;
+    });
+    const balanced = playerIds.every((id) => {
+      const home = homes.get(id); const guest = guests.get(id);
+      return Math.abs(home[0] - guest[0]) <= 1 && Math.abs(home[1] - guest[1]) <= 1
+        && home[0] + home[1] === guest[0] + guest[1];
+    });
+    const checks = { pairs_twice: pairsTwice, balanced, no_self_play: noSelf, one_match_per_round: onePerRound };
+    Object.entries(checks).forEach(([name, valid]) => {
+      const item = groupElement.querySelector(`[data-check="${name}"]`);
+      item.classList.toggle('is-valid', valid);
+      item.classList.toggle('is-warning', !valid && name !== 'no_self_play');
+      item.classList.toggle('is-invalid', !valid && name === 'no_self_play');
+    });
+    payloadField.value = JSON.stringify(payload);
+  };
+
+  form.querySelectorAll('[data-fixture-group]').forEach((groupElement) => {
+    groupElement.querySelectorAll('[data-fixture-match]').forEach((matchElement) => {
+      matchElement.querySelector('[data-swap-fixture]').addEventListener('click', () => {
+        [matchElement.dataset.homeId, matchElement.dataset.guestId] = [matchElement.dataset.guestId, matchElement.dataset.homeId];
+        const home = matchElement.querySelector('[data-home-name]');
+        const guest = matchElement.querySelector('[data-guest-name]');
+        [home.textContent, guest.textContent] = [guest.textContent, home.textContent];
+        syncGroup(groupElement);
+      });
+      matchElement.querySelector('[data-delete-fixture]').addEventListener('click', () => {
+        matchElement.remove();
+        syncGroup(groupElement);
+      });
+      matchElement.querySelector('[data-match-time]').addEventListener('change', () => syncGroup(groupElement));
+    });
+    groupElement.querySelectorAll('[data-round-date]').forEach((input) => {
+      input.addEventListener('change', () => {
+        input.closest('[data-fixture-round]').querySelectorAll('[data-match-time]').forEach((matchTime) => {
+          const timeValue = matchTime.value.includes('T') ? matchTime.value.split('T')[1] : '18:00';
+          matchTime.value = `${input.value}T${timeValue}`;
+        });
+        syncGroup(groupElement);
+      });
+    });
+    syncGroup(groupElement);
+  });
+  form.addEventListener('submit', () => form.querySelectorAll('[data-fixture-group]').forEach(syncGroup));
 });
 

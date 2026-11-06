@@ -1,0 +1,66 @@
+{% extends "admin/base.html" %}
+{% block admin_title %}Generiraj razpored{% endblock %}
+{% block admin_content %}
+<div class="admin-heading fixture-heading">
+  <div><h1>Generiraj razpored</h1><p>Vsak igralec igra z vsakim v svoji ligi dvakrat: enkrat doma, enkrat v gosteh.</p></div>
+  <a class="button button-secondary" href="{{ url_for('admin.matches') }}">Nazaj</a>
+</div>
+
+{% if selected_season %}
+<form method="post" action="{{ url_for('admin.fixture_preview') }}" class="fixture-form" data-fixture-generator>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <section class="card fixture-section">
+    <div class="form-field fixture-season-field">
+      <label for="fixture-season">Sezona</label>
+      <select id="fixture-season" class="input" name="season_id" data-fixture-season>
+        {% for season in seasons %}<option value="{{ season.id }}"{{ ' selected' if season.id == selected_season.id else '' }}>{{ season.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <h2>Lige</h2>
+    <div class="fixture-league-list">
+      {% for row in group_rows %}
+      <div class="fixture-league-row{{ ' has-existing' if row.existing_count else '' }}">
+        <label class="fixture-league-check">
+          <input type="checkbox" name="group_ids" value="{{ row.group.id }}"{{ ' checked' if not row.existing_count and row.player_count >= 2 else '' }}{{ ' disabled' if row.player_count < 2 else '' }}>
+          <strong>{{ row.group.name }}</strong>
+        </label>
+        <span>{{ row.player_count }} igralcev</span>
+        <span class="fixture-metric">{{ row.round_count }} krogov</span>
+        <span class="fixture-metric">{{ row.match_count }} tekem</span>
+        {% if row.player_count < 2 %}
+          <span class="fixture-state is-warning">Premalo igralcev</span>
+        {% elif row.existing_count %}
+          <label class="fixture-replace"><input type="checkbox" name="replace_unplayed_group_ids" value="{{ row.group.id }}"> Zamenjaj {{ row.existing_count }} neodigranih</label>
+        {% elif row.player_count % 2 %}
+          <span class="fixture-state is-bye">Liho število: 1 prost igralec na krog</span>
+        {% else %}
+          <span class="fixture-state">Pripravljeno</span>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    <p class="fixture-note">Lige z obstoječimi tekmami so privzeto izpuščene. Zamenjava ohrani odigrane tekme.</p>
+  </section>
+
+  <section class="card fixture-section">
+    <h2>Termini</h2>
+    <div class="fixture-time-grid">
+      <div class="form-field"><label for="start-date">Začetek 1. kroga</label><input class="input" id="start-date" type="date" name="start_date" value="{{ default_start.isoformat() }}" required data-fixture-start></div>
+      <div class="form-field"><label>Dan v tednu</label><output class="input fixture-output" data-fixture-weekday>—</output></div>
+      <div class="form-field"><label for="first-time">Prva ura</label><input class="input" id="first-time" type="time" name="first_time" value="18:00" required></div>
+      <div class="form-field"><label for="round-gap">Razmik med krogi</label><div class="input-suffix"><input class="input" id="round-gap" type="number" name="days_between_rounds" value="7" min="1" max="365" required><span>dni</span></div></div>
+    </div>
+  </section>
+
+  <section class="card fixture-section fixture-rules">
+    <h2>Pravila (fiksna)</h2>
+    <p>🔒 Igralec ne more igrati proti sebi.</p>
+    <p>🔒 Prvi del: vsak z vsakim enkrat. Drugi del: isti pari zrcalno (domači ↔ gost).</p>
+    <p>🔒 Igralci igrajo samo v svoji ligi. Tekme lahko po generiranju uredite.</p>
+  </section>
+  <div class="fixture-actions"><a class="button button-secondary" href="{{ url_for('admin.matches') }}">Prekliči</a><button class="button" type="submit">Ustvari predogled</button></div>
+</form>
+{% else %}
+<div class="card empty-state">Najprej ustvarite sezono in lige.</div>
+{% endif %}
+{% endblock %}

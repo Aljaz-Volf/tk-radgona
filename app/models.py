@@ -6,7 +6,7 @@ from decimal import Decimal
 from flask import current_app
 from flask_login import UserMixin
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
-from sqlalchemy import CheckConstraint, Index, UniqueConstraint
+from sqlalchemy import CheckConstraint, Index, UniqueConstraint, text
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from .extensions import db, login_manager
@@ -162,6 +162,9 @@ class Match(TimestampMixin, db.Model):
     player1_id = db.Column(db.Integer, db.ForeignKey("players.id", ondelete="RESTRICT"), nullable=False, index=True)
     player2_id = db.Column(db.Integer, db.ForeignKey("players.id", ondelete="RESTRICT"), nullable=False, index=True)
     winner_id = db.Column(db.Integer, db.ForeignKey("players.id", ondelete="SET NULL"), index=True)
+    round_number = db.Column(db.Integer, index=True)
+    leg = db.Column(db.Integer)
+    generated = db.Column(db.Boolean, nullable=False, default=False)
     scheduled_at = db.Column(db.DateTime(timezone=True), index=True)
     played_at = db.Column(db.DateTime(timezone=True))
     status = db.Column(db.String(24), nullable=False, default="scheduled", index=True)
@@ -173,9 +176,42 @@ class Match(TimestampMixin, db.Model):
     winner = db.relationship("Player", foreign_keys=[winner_id])
     __table_args__ = (
         CheckConstraint("player1_id <> player2_id", name="different_players"),
+        CheckConstraint("round_number is null or round_number > 0", name="positive_round_number"),
+        CheckConstraint("leg is null or leg in (1, 2)", name="valid_leg"),
         CheckConstraint("status in ('scheduled','completed','cancelled','walkover')", name="valid_status"),
+        Index(
+            "uq_matches_scheduled_fixture",
+            "season_id", "group_id", "player1_id", "player2_id",
+            unique=True,
+            sqlite_where=text("round_number IS NOT NULL"),
+            postgresql_where=text("round_number IS NOT NULL"),
+        ),
         Index("ix_matches_schedule_status", "scheduled_at", "status"),
     )
+
+    @property
+    def home_player_id(self):
+        return self.player1_id
+
+    @home_player_id.setter
+    def home_player_id(self, value):
+        self.player1_id = value
+
+    @property
+    def guest_player_id(self):
+        return self.player2_id
+
+    @guest_player_id.setter
+    def guest_player_id(self, value):
+        self.player2_id = value
+
+    @property
+    def home_player(self):
+        return self.player1
+
+    @property
+    def guest_player(self):
+        return self.player2
 
 
 class MatchSet(db.Model):
