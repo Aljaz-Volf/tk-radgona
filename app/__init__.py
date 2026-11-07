@@ -9,10 +9,15 @@ from .extensions import csrf, db, limiter, login_manager, migrate
 
 
 def create_app(config_object=Config):
-    app = Flask(__name__, instance_relative_config=True)
+    app = Flask(
+        __name__,
+        instance_relative_config=True,
+        instance_path=config_object.INSTANCE_PATH,
+    )
     app.config.from_object(config_object)
     Path(app.instance_path).mkdir(parents=True, exist_ok=True)
-    Path(app.config["UPLOAD_FOLDER"]).mkdir(parents=True, exist_ok=True)
+    if app.config["STORAGE_BACKEND"] == "local":
+        Path(app.config["UPLOAD_FOLDER"]).mkdir(parents=True, exist_ok=True)
 
     db.init_app(app)
     migrate.init_app(app, db, compare_type=True)

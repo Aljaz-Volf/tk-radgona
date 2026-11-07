@@ -13,3 +13,5 @@ dist/
 .uv-cache/
 .uv-python/
 
+.neon
+node_modules/

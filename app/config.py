@@ -1,8 +1,22 @@
 import os
+import tempfile
 from pathlib import Path
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def _runtime_dir() -> Path:
+    """Return a writable directory for files created while the app is running."""
+    configured = os.getenv("RUNTIME_DIR")
+    if configured:
+        return Path(configured).expanduser().resolve()
+    if os.getenv("VERCEL"):
+        return Path(tempfile.gettempdir()) / "tk-radgona"
+    return BASE_DIR / "instance"
+
+
+RUNTIME_DIR = _runtime_dir()
 
 
 def _bool_env(name: str, default: bool = False) -> bool:
@@ -11,7 +25,7 @@ def _bool_env(name: str, default: bool = False) -> bool:
 
 
 def _database_url() -> str:
-    value = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR / 'instance' / 'tenis.db'}")
+    value = os.getenv("DATABASE_URL", f"sqlite:///{RUNTIME_DIR / 'tenis.db'}")
     if value.startswith("postgres://"):
         return value.replace("postgres://", "postgresql+psycopg://", 1)
     if value.startswith("postgresql://"):
@@ -20,6 +34,7 @@ def _database_url() -> str:
 
 
 class Config:
+    INSTANCE_PATH = str(RUNTIME_DIR)
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-only-change-me")
     SQLALCHEMY_DATABASE_URI = _database_url()
     SQLALCHEMY_TRACK_MODIFICATIONS = False
@@ -30,7 +45,7 @@ class Config:
     SESSION_COOKIE_SAMESITE = "Lax"
     SESSION_COOKIE_SECURE = _bool_env("SESSION_COOKIE_SECURE")
     MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_LENGTH", 10 * 1024 * 1024))
-    UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", str(BASE_DIR / "instance" / "uploads"))
+    UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", str(RUNTIME_DIR / "uploads"))
     STORAGE_BACKEND = os.getenv("STORAGE_BACKEND", "local").lower()
     S3_BUCKET = os.getenv("S3_BUCKET")
     S3_REGION = os.getenv("S3_REGION", "eu-central-1")
