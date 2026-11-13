@@ -6,7 +6,7 @@ from flask.cli import with_appcontext
 from flask_migrate import upgrade
 
 from .extensions import db
-from .models import ClubContent, Court, Role, User
+from .models import BUILT_IN_ROLES, ClubContent, Court, Role, User
 from .services.content import sanitize_rich_text
 
 
@@ -21,8 +21,11 @@ def register_commands(app):
 def init_db():
     """Apply migrations and ensure the built-in roles exist."""
     upgrade()
-    for name, description in [("administrator", "Polni skrbniški dostop"), ("member", "Član kluba")]:
-        if not Role.query.filter_by(name=name).first():
+    for name, description in BUILT_IN_ROLES:
+        role = Role.query.filter_by(name=name).first()
+        if role:
+            role.description = description
+        else:
             db.session.add(Role(name=name, description=description))
     db.session.commit()
     click.echo("Database migrations applied and roles initialized.")
@@ -34,20 +37,20 @@ def init_db():
 @click.password_option(confirmation_prompt=True, prompt="Password")
 @with_appcontext
 def create_admin(email, username, password):
-    """Create the first administrator without hardcoded credentials."""
+    """Create the first superadministrator without hardcoded credentials."""
     if len(password) < 12:
         raise click.ClickException("Password must contain at least 12 characters.")
     if User.query.filter((User.email == email.lower()) | (User.username == username)).first():
         raise click.ClickException("A user with that email or username already exists.")
-    role = Role.query.filter_by(name="administrator").first()
+    role = Role.query.filter_by(name="superadmin").first()
     if not role:
-        role = Role(name="administrator", description="Polni skrbniški dostop")
+        role = Role(name="superadmin", description="Polni skrbniški dostop")
         db.session.add(role)
     user = User(email=email.lower(), username=username, roles=[role])
     user.set_password(password)
     db.session.add(user)
     db.session.commit()
-    click.echo(f"Administrator {username} created.")
+    click.echo(f"Superadministrator {username} created.")
 
 
 @click.command("seed-development")

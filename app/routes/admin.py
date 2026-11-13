@@ -19,6 +19,7 @@ from ..forms import (
     MemberForm,
     NewsForm,
     PlayerForm,
+    ROLE_CHOICES,
     SeasonCreateForm,
     SeasonForm,
     SettingsForm,
@@ -65,13 +66,35 @@ from ..services.reservations import ReservationConflict, create_reservation
 
 bp = Blueprint("admin", __name__)
 
+CONTENT_CONTRIBUTOR_ENDPOINTS = {"admin.news_create", "admin.gallery_form"}
+
+
+def _is_content_contributor_only():
+    return current_user.has_any_role("member_news") and not current_user.has_any_role(
+        "superadmin", "administrator"
+    )
+
+
+def _content_return_url(admin_endpoint, public_endpoint):
+    endpoint = public_endpoint if _is_content_contributor_only() else admin_endpoint
+    return url_for(endpoint)
+
 
 @bp.before_request
 def require_admin():
     if not current_user.is_authenticated:
         return redirect(url_for("auth.login", next=request.full_path))
-    if not current_user.has_any_role("administrator"):
-        abort(403)
+    if current_user.has_any_role("superadmin"):
+        return None
+    if current_user.has_any_role("administrator"):
+        if request.endpoint == "admin.dashboard":
+            return redirect(url_for("admin.news"))
+        return None
+    if current_user.has_any_role("member_news") and request.endpoint in CONTENT_CONTRIBUTOR_ENDPOINTS:
+        if request.endpoint == "admin.gallery_form" and request.view_args.get("gallery_id") is not None:
+            abort(403)
+        return None
+    abort(403)
 
 
 @bp.get("/")
@@ -191,7 +214,7 @@ def news_create():
             record("news.create", article)
             db.session.commit()
             flash("Članek je shranjen.", "success")
-            return redirect(url_for("admin.news"))
+            return redirect(_content_return_url("admin.news", "public.news_index"))
     return render_template("admin/news/form.html", form=form, article=None)
 
 
@@ -1652,7 +1675,7 @@ def gallery_form(gallery_id=None):
         record("gallery.update" if gallery_id else "gallery.create", gallery)
         db.session.commit()
         flash("Galerija je shranjena.", "success")
-        return redirect(url_for("admin.galleries"))
+        return redirect(_content_return_url("admin.galleries", "public.gallery_index"))
     return render_template("admin/galleries/form.html", form=form, gallery=gallery)
 
 
@@ -1774,6 +1797,8 @@ def users():
 @bp.route("/uporabniki/nov", methods=["GET", "POST"])
 def user_create():
     form = UserCreateForm()
+    if not current_user.has_any_role("superadmin"):
+        form.roles.choices = [choice for choice in ROLE_CHOICES if choice[0] != "superadmin"]
     if form.validate_on_submit():
         email = form.email.data.strip().lower()
         username = form.username.data.strip()
@@ -1795,13 +1820,19 @@ def user_create():
 @bp.route("/uporabniki/<int:user_id>/dostop", methods=["GET", "POST"])
 def user_access(user_id):
     user = db.get_or_404(User, user_id)
+    is_superadmin = current_user.has_any_role("superadmin")
+    if user.has_any_role("superadmin") and not is_superadmin:
+        abort(403)
     form = UserRoleForm()
+    if not is_superadmin:
+        form.roles.choices = [choice for choice in ROLE_CHOICES if choice[0] != "superadmin"]
     if request.method == "GET":
         form.roles.data = [role.name for role in user.roles]
         form.active.data = user.is_active
     if form.validate_on_submit():
         roles = Role.query.filter(Role.name.in_(form.roles.data)).all()
-        if user.id == current_user.id and (not form.active.data or "administrator" not in form.roles.data):
+        required_self_role = "superadmin" if is_superadmin else "administrator"
+        if user.id == current_user.id and (not form.active.data or required_self_role not in form.roles.data):
             form.roles.errors.append("Svojemu računu ne morete odvzeti skrbniškega dostopa.")
         else:
             user.roles = roles

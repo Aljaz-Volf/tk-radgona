@@ -27,7 +27,7 @@ SQLite is the zero-configuration local/test fallback. Production is designed for
 ## Implemented features
 
 - Secure login with scrypt password hashing, Flask-Login sessions, CSRF protection, safe redirect validation, login/reset rate limits, role checks and time-limited password-reset tokens.
-- Administrator and member roles; administrator-created accounts and permission management; no default or hardcoded administrator.
+- Superadministrator, administrator, news/gallery editor and member roles; administrator-created accounts and permission management; no default or hardcoded administrator.
 - Database-driven public homepage, news, club pages, league/archive, player pages, results, standings, reservations and photo galleries.
 - Administration dashboard with live database statistics and activity audit log.
 - News drafts/publication scheduling, categories, sanitized rich text and validated images.
@@ -52,7 +52,14 @@ flask --app run create-admin
 flask --app run run --debug
 ```
 
-Open `http://127.0.0.1:5000`. `init-db` is idempotent: it applies pending Alembic migrations and ensures the two built-in role records exist. Use `flask --app run seed-development --confirm-fictional` only for explicitly labelled local demo records; that command refuses to run when `FLASK_ENV=production`.
+Open `http://127.0.0.1:5000`. `init-db` is idempotent: it applies pending Alembic migrations and ensures all four built-in role records exist. `create-admin` creates the first `superadmin`. Use `flask --app run seed-development --confirm-fictional` only for explicitly labelled local demo records; that command refuses to run when `FLASK_ENV=production`.
+
+Role access is intentionally distinct:
+
+- `superadmin`: every administration page, including Overview and role assignment.
+- `administrator`: administration pages except Overview; cannot grant or remove `superadmin`.
+- `member_news`: creates articles and gallery albums from buttons on the public News and Gallery pages; does not see the Administration link.
+- `member`: sees the authenticated member directory and gallery.
 
 Run tests:
 

@@ -7,7 +7,7 @@
     <h1>{{ 'Uredi članek' if article else 'Nov članek' }}</h1>
     <p>Vsebina se pred shranjevanjem varno očisti.</p>
   </div>
-  <a class="button button-secondary" href="{{ url_for('admin.news') }}">Nazaj</a>
+  <a class="button button-secondary" href="{{ url_for('public.news_index') if content_contributor_only else url_for('admin.news') }}">Nazaj</a>
 </div>
 
 <div class="card panel news-editor">

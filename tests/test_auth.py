@@ -40,3 +40,70 @@ def test_anonymous_admin_redirects_to_login(client):
     assert response.status_code == 302
     assert "/racun/prijava" in response.location
 
+
+def test_create_admin_command_bootstraps_a_superadmin(app):
+    result = app.test_cli_runner().invoke(
+        args=[
+            "create-admin",
+            "--email",
+            "owner@example.test",
+            "--username",
+            "owner",
+            "--password",
+            "a secure bootstrap password",
+        ]
+    )
+    assert result.exit_code == 0, result.output
+    with app.app_context():
+        owner = User.query.filter_by(username="owner").one()
+        assert owner.has_any_role("superadmin")
+
+
+def test_administrator_has_admin_tools_but_not_overview(client, administrator):
+    login(client, "administrator")
+    response = client.get("/admin/")
+    assert response.status_code == 302
+    assert response.location.endswith("/admin/novice")
+    news = client.get("/admin/novice")
+    assert news.status_code == 200
+    assert ">Pregled<" not in news.get_data(as_text=True)
+
+
+def test_member_news_uses_public_create_buttons_only(client, member_news):
+    login(client, "editor")
+
+    news = client.get("/novice").get_data(as_text=True)
+    gallery = client.get("/galerije").get_data(as_text=True)
+    assert "Dodaj novico" in news
+    assert "Dodaj album" in gallery
+    assert ">Administracija<" not in news
+
+    news_form = client.get("/admin/novice/nova")
+    gallery_form = client.get("/admin/galerije/nova")
+    assert news_form.status_code == 200
+    assert gallery_form.status_code == 200
+    assert "Administracija" not in news_form.get_data(as_text=True)
+    assert "Administracija" not in gallery_form.get_data(as_text=True)
+
+    assert client.get("/admin/novice").status_code == 403
+    assert client.get("/admin/galerije").status_code == 403
+    assert client.get("/admin/igralci").status_code == 403
+
+    article = client.post(
+        "/admin/novice/nova",
+        data={"title": "Nova novica", "body": "Vsebina", "status": "draft"},
+    )
+    album = client.post(
+        "/admin/galerije/nova",
+        data={"title": "Nov album", "description": "Opis"},
+    )
+    assert article.status_code == 302
+    assert article.location.endswith("/novice")
+    assert album.status_code == 302
+    assert album.location.endswith("/galerije")
+
+
+def test_administrator_cannot_manage_superadmin_access(client, admin, administrator):
+    login(client, "administrator")
+    assert client.get(f"/admin/uporabniki/{admin}/dostop").status_code == 403
+

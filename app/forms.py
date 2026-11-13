@@ -20,6 +20,12 @@ from wtforms.validators import DataRequired, Email, EqualTo, InputRequired, Leng
 
 
 IMAGE_TYPES = ["jpg", "jpeg", "png", "webp"]
+ROLE_CHOICES = [
+    ("superadmin", "Superadministrator"),
+    ("administrator", "Administrator"),
+    ("member_news", "Urednik novic in galerij"),
+    ("member", "Član"),
+]
 
 
 class LoginForm(FlaskForm):
@@ -294,7 +300,7 @@ class CommitteeMemberForm(FlaskForm):
 
 
 class UserRoleForm(FlaskForm):
-    roles = SelectMultipleField("Vloge", choices=[("administrator", "Administrator"), ("member", "Član")])
+    roles = SelectMultipleField("Vloge", choices=ROLE_CHOICES)
     active = BooleanField("Aktiven račun")
     submit = SubmitField("Shrani dostop")
 
@@ -303,7 +309,7 @@ class UserCreateForm(FlaskForm):
     email = StringField("E-pošta", validators=[DataRequired(), Email(), Length(max=254)])
     username = StringField("Uporabniško ime", validators=[DataRequired(), Length(min=3, max=80)])
     password = PasswordField("Začasno geslo", validators=[DataRequired(), Length(min=12, max=256)])
-    roles = SelectMultipleField("Vloge", choices=[("administrator", "Administrator"), ("member", "Član")], validators=[DataRequired()])
+    roles = SelectMultipleField("Vloge", choices=ROLE_CHOICES, validators=[DataRequired()])
     submit = SubmitField("Ustvari račun")
 
 

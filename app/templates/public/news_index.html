@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Novice | TK Gornja Radgona{% endblock %}
 {% block content %}
-<header class="page-header"><div class="wrap"><div class="kicker">Dogajanje v klubu</div><h1>Novice</h1><p>Obvestila, turnirji in novice Teniškega kluba Gornja Radgona.</p></div></header>
+<header class="page-header"><div class="wrap"><div class="kicker">Dogajanje v klubu</div><h1>Novice</h1><p>Obvestila, turnirji in novice Teniškega kluba Gornja Radgona.</p>{% if current_user.is_authenticated and current_user.has_any_role('superadmin', 'administrator', 'member_news') %}<a class="button" href="{{ url_for('admin.news_create') }}">Dodaj novico</a>{% endif %}</div></header>
 <section class="section"><div class="wrap">
   {% if articles %}<div class="news-grid">{% for article in articles %}<a class="card news-card" href="{{ url_for('public.news_detail', slug=article.slug) }}">{% if article.cover_image_key %}<img class="news-card-image" src="{{ url_for('public.media', key=article.cover_image_key) }}" alt="">{% endif %}<div class="card-body"><div class="meta"><time>{{ article.published_at.strftime('%d. %m. %Y') }}</time></div><h3>{{ article.title }}</h3>{% if article.summary %}<p>{{ article.summary }}</p>{% endif %}<span class="text-link">Preberi več →</span></div></a>{% endfor %}</div>
   {% else %}<div class="empty-state"><strong>Novice še niso objavljene.</strong>Prosimo, obiščite nas znova.</div>{% endif %}

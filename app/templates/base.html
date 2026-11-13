@@ -46,7 +46,7 @@
         <a href="{{ url_for('public.news_index') }}">Novice</a>
         {% if current_user.is_authenticated %}<a href="{{ url_for('public.gallery_index') }}">Galerija</a>{% endif %}
         {% if current_user.is_authenticated %}
-          {% if current_user.has_any_role('administrator') %}<a href="{{ url_for('admin.dashboard') }}">Administracija</a>{% endif %}
+          {% if current_user.has_any_role('superadmin') %}<a href="{{ url_for('admin.dashboard') }}">Administracija</a>{% elif current_user.has_any_role('administrator') %}<a href="{{ url_for('admin.news') }}">Administracija</a>{% endif %}
           <a href="{{ url_for('auth.profile') }}">Moj račun</a>
           <form action="{{ url_for('auth.logout') }}" method="post" class="inline-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="nav-button" type="submit">Odjava</button></form>
         {% else %}

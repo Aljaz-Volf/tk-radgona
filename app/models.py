@@ -12,6 +12,14 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from .extensions import db, login_manager
 
 
+BUILT_IN_ROLES = (
+    ("superadmin", "Polni skrbniški dostop"),
+    ("administrator", "Upravljanje brez pregleda administracije"),
+    ("member_news", "Ustvarjanje novic in galerij"),
+    ("member", "Član kluba"),
+)
+
+
 def utcnow():
     return datetime.now(timezone.utc)
 
