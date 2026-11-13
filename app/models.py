@@ -18,6 +18,7 @@ BUILT_IN_ROLES = (
     ("member_news", "Ustvarjanje novic in galerij"),
     ("member", "Član kluba"),
 )
+PASSWORD_MIN_LENGTH = 6
 
 
 def utcnow():

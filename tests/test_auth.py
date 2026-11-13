@@ -30,6 +30,17 @@ def test_password_reset_token_is_time_limited(app, admin):
         assert User.verify_reset_token(token) is None
 
 
+def test_password_reset_accepts_six_characters(app, client, admin):
+    with app.app_context():
+        token = db.session.get(User, admin).get_reset_token()
+    response = client.post(
+        f"/racun/novo-geslo/{token}",
+        data={"password": "abc123", "confirm": "abc123"},
+    )
+    assert response.status_code == 302
+    assert login(client, "admin", "abc123").status_code == 302
+
+
 def test_member_cannot_access_admin(client, member):
     login(client, "member")
     assert client.get("/admin/").status_code == 403
@@ -50,13 +61,29 @@ def test_create_admin_command_bootstraps_a_superadmin(app):
             "--username",
             "owner",
             "--password",
-            "a secure bootstrap password",
+            "abc123",
         ]
     )
     assert result.exit_code == 0, result.output
     with app.app_context():
         owner = User.query.filter_by(username="owner").one()
         assert owner.has_any_role("superadmin")
+
+
+def test_admin_can_create_user_with_six_character_password(app, client, admin):
+    login(client)
+    response = client.post(
+        "/admin/uporabniki/nov",
+        data={
+            "email": "six@example.com",
+            "username": "sixchars",
+            "password": "abc123",
+            "roles": ["member"],
+        },
+    )
+    assert response.status_code == 302, response.get_data(as_text=True)
+    client.post("/racun/odjava")
+    assert login(client, "sixchars", "abc123").status_code == 302
 
 
 def test_administrator_has_admin_tools_but_not_overview(client, administrator):

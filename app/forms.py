@@ -18,6 +18,8 @@ from wtforms import (
 )
 from wtforms.validators import DataRequired, Email, EqualTo, InputRequired, Length, NumberRange, Optional, ValidationError
 
+from .models import PASSWORD_MIN_LENGTH
+
 
 IMAGE_TYPES = ["jpg", "jpeg", "png", "webp"]
 ROLE_CHOICES = [
@@ -41,7 +43,9 @@ class ForgotPasswordForm(FlaskForm):
 
 
 class ResetPasswordForm(FlaskForm):
-    password = PasswordField("Novo geslo", validators=[DataRequired(), Length(min=12, max=256)])
+    password = PasswordField(
+        "Novo geslo", validators=[DataRequired(), Length(min=PASSWORD_MIN_LENGTH, max=256)]
+    )
     confirm = PasswordField("Ponovite geslo", validators=[DataRequired(), EqualTo("password")])
     submit = SubmitField("Shrani novo geslo")
 
@@ -308,7 +312,9 @@ class UserRoleForm(FlaskForm):
 class UserCreateForm(FlaskForm):
     email = StringField("E-pošta", validators=[DataRequired(), Email(), Length(max=254)])
     username = StringField("Uporabniško ime", validators=[DataRequired(), Length(min=3, max=80)])
-    password = PasswordField("Začasno geslo", validators=[DataRequired(), Length(min=12, max=256)])
+    password = PasswordField(
+        "Začasno geslo", validators=[DataRequired(), Length(min=PASSWORD_MIN_LENGTH, max=256)]
+    )
     roles = SelectMultipleField("Vloge", choices=ROLE_CHOICES, validators=[DataRequired()])
     submit = SubmitField("Ustvari račun")
 

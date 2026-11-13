@@ -6,7 +6,7 @@ from flask.cli import with_appcontext
 from flask_migrate import upgrade
 
 from .extensions import db
-from .models import BUILT_IN_ROLES, ClubContent, Court, Role, User
+from .models import BUILT_IN_ROLES, PASSWORD_MIN_LENGTH, ClubContent, Court, Role, User
 from .services.content import sanitize_rich_text
 
 
@@ -38,8 +38,10 @@ def init_db():
 @with_appcontext
 def create_admin(email, username, password):
     """Create the first superadministrator without hardcoded credentials."""
-    if len(password) < 12:
-        raise click.ClickException("Password must contain at least 12 characters.")
+    if len(password) < PASSWORD_MIN_LENGTH:
+        raise click.ClickException(
+            f"Password must contain at least {PASSWORD_MIN_LENGTH} characters."
+        )
     if User.query.filter((User.email == email.lower()) | (User.username == username)).first():
         raise click.ClickException("A user with that email or username already exists.")
     role = Role.query.filter_by(name="superadmin").first()
