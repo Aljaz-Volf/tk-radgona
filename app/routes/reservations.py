@@ -25,7 +25,9 @@ def create():
 @login_required
 def cancel(reservation_id):
     reservation = db.get_or_404(Reservation, reservation_id)
-    if reservation.user_id != current_user.id and not current_user.has_any_role("administrator"):
+    if reservation.user_id != current_user.id and not current_user.has_any_role(
+        "owner", "superadmin", "administrator"
+    ):
         return ("", 403)
     comparison_time = datetime.now(reservation.starts_at.tzinfo) if reservation.starts_at.tzinfo else datetime.now()
     if reservation.status == "confirmed" and reservation.starts_at > comparison_time:

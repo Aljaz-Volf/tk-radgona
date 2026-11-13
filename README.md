@@ -27,7 +27,7 @@ SQLite is the zero-configuration local/test fallback. Production is designed for
 ## Implemented features
 
 - Secure login with scrypt password hashing, Flask-Login sessions, CSRF protection, safe redirect validation, login/reset rate limits, role checks and time-limited password-reset tokens.
-- Superadministrator, administrator, news/gallery editor and member roles; administrator-created accounts and permission management; no default or hardcoded administrator.
+- Owner, superadministrator, administrator, news/gallery editor and member roles; administrator-created accounts and permission management; no default or hardcoded administrator.
 - Database-driven public homepage, news, club pages, league/archive, player pages, results, standings, reservations and photo galleries.
 - Administration dashboard with live database statistics and activity audit log.
 - News drafts/publication scheduling, categories, sanitized rich text and validated images.
@@ -52,12 +52,15 @@ flask --app run create-admin
 flask --app run run --debug
 ```
 
-Open `http://127.0.0.1:5000`. `init-db` is idempotent: it applies pending Alembic migrations and ensures all four built-in role records exist. `create-admin` creates the first `superadmin`. Use `flask --app run seed-development --confirm-fictional` only for explicitly labelled local demo records; that command refuses to run when `FLASK_ENV=production`.
+Open `http://127.0.0.1:5000`. `init-db` is idempotent: it applies pending Alembic migrations and ensures all five built-in role records exist. `create-admin` creates a `superadmin`. For an existing installation with no owner, run `flask --app run bootstrap-owner --username <username>` once to promote the initial account. Use `flask --app run seed-development --confirm-fictional` only for explicitly labelled local demo records; that command refuses to run when `FLASK_ENV=production`.
+
+Add the repeat-safe fictional showcase roster (40 men and 10 women) with `flask --app run seed-showcase-players --confirm-fictional`.
 
 Role access is intentionally distinct:
 
-- `superadmin`: every administration page, including Overview and role assignment.
-- `administrator`: administration pages except Overview; cannot grant or remove `superadmin`.
+- `owner`: the only role that can see, assign or remove the owner role; can manage every account.
+- `superadmin`: every administration page and every non-owner account, including other superadministrators.
+- `administrator`: administration pages except Overview; manages only `member_news` and `member` accounts.
 - `member_news`: creates articles and gallery albums from buttons on the public News and Gallery pages; does not see the Administration link.
 - `member`: sees the authenticated member directory and gallery.
 
@@ -76,6 +79,7 @@ Copy `.env.example` to `.env` and replace at least:
 - `SESSION_COOKIE_SECURE=true`: required behind production HTTPS.
 - `RATELIMIT_STORAGE_URI`: use shared Redis-compatible storage when running multiple processes; in-memory storage is local-only.
 - SMTP variables: required for delivery of password-reset messages.
+- `PUBLIC_BASE_URL`: public HTTPS origin used to build password-change links (for example `https://tenis.example.si`).
 - `STORAGE_BACKEND`: `local` for development or `s3` for production.
 - `S3_*`: bucket, region, optional S3-compatible endpoint, credentials and optional public CDN base. Without a public base, media is served through five-minute signed URLs.
 - `UPLOAD_FOLDER`: local persistent path used only by the development backend.

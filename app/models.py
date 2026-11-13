@@ -13,6 +13,7 @@ from .extensions import db, login_manager
 
 
 BUILT_IN_ROLES = (
+    ("owner", "Najvišji dostop in upravljanje lastnikov"),
     ("superadmin", "Polni skrbniški dostop"),
     ("administrator", "Upravljanje brez pregleda administracije"),
     ("member_news", "Ustvarjanje novic in galerij"),

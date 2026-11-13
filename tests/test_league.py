@@ -406,6 +406,74 @@ def test_seasons_overview_shows_league_counts_and_unassigned_players(app, client
     assert "Dodaj ligo" in html
 
 
+def test_superadmin_can_delete_league_and_dependent_results(app, client, admin):
+    with app.app_context():
+        season, group, first, second, match = _league(app)
+        recalculate_group(group)
+        db.session.commit()
+        season_id = season.id
+        group_id = group.id
+        player_ids = (first.id, second.id)
+        match_id = match.id
+
+    login(client)
+    overview = client.get("/admin/liga").get_data(as_text=True)
+    assert f'/admin/liga/skupina/{group_id}/izbrisi' in overview
+    response = client.post(f"/admin/liga/skupina/{group_id}/izbrisi")
+    assert response.status_code == 302
+
+    with app.app_context():
+        assert db.session.get(LeagueGroup, group_id) is None
+        assert db.session.get(Match, match_id) is None
+        assert LeagueMembership.query.filter_by(group_id=group_id).count() == 0
+        assert Standing.query.filter_by(group_id=group_id).count() == 0
+        assert db.session.get(Season, season_id) is not None
+        assert all(db.session.get(Player, player_id) is not None for player_id in player_ids)
+
+
+def test_administrator_cannot_delete_league(app, client, administrator):
+    with app.app_context():
+        _, group, *_ = _league(app)
+        group_id = group.id
+
+    login(client, "administrator")
+    overview = client.get("/admin/liga").get_data(as_text=True)
+    assert f'/admin/liga/skupina/{group_id}/izbrisi' not in overview
+    assert client.post(f"/admin/liga/skupina/{group_id}/izbrisi").status_code == 403
+    with app.app_context():
+        assert db.session.get(LeagueGroup, group_id) is not None
+
+
+def test_owner_can_delete_league(app, client, owner):
+    with app.app_context():
+        _, group, *_ = _league(app)
+        group_id = group.id
+
+    login(client, "owner")
+    assert client.post(f"/admin/liga/skupina/{group_id}/izbrisi").status_code == 302
+    with app.app_context():
+        assert db.session.get(LeagueGroup, group_id) is None
+
+
+def test_showcase_player_seed_is_repeat_safe(app):
+    runner = app.test_cli_runner()
+    refused = runner.invoke(args=["seed-showcase-players"])
+    assert refused.exit_code != 0
+
+    created = runner.invoke(args=["seed-showcase-players", "--confirm-fictional"])
+    assert created.exit_code == 0, created.output
+    with app.app_context():
+        players = Player.query.all()
+        assert len(players) == 50
+        assert sum("kategorija: moški" in (player.bio or "") for player in players) == 40
+        assert sum("kategorija: ženske" in (player.bio or "") for player in players) == 10
+
+    repeated = runner.invoke(args=["seed-showcase-players", "--confirm-fictional"])
+    assert repeated.exit_code == 0, repeated.output
+    with app.app_context():
+        assert Player.query.count() == 50
+
+
 def test_admin_can_save_player_leagues_and_starting_order(app, client, admin):
     with app.app_context():
         season = Season(

@@ -17,6 +17,7 @@ def app(tmp_path):
     with application.app_context():
         db.create_all()
         db.session.add_all([
+            Role(name="owner", description="Lastnik"),
             Role(name="superadmin", description="Superadministrator"),
             Role(name="administrator", description="Administrator"),
             Role(name="member_news", description="Urednik novic in galerij"),
@@ -39,6 +40,17 @@ def admin(app):
     with app.app_context():
         role = Role.query.filter_by(name="superadmin").one()
         user = User(email="admin@example.test", username="admin", roles=[role])
+        user.set_password("correct horse battery staple")
+        db.session.add(user)
+        db.session.commit()
+        return user.id
+
+
+@pytest.fixture()
+def owner(app):
+    with app.app_context():
+        role = Role.query.filter_by(name="owner").one()
+        user = User(email="owner@example.test", username="owner", roles=[role])
         user.set_password("correct horse battery staple")
         db.session.add(user)
         db.session.commit()

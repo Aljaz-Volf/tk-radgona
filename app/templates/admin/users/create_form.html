@@ -1,2 +1,38 @@
-{% extends "admin/base.html" %}{% from "macros/forms.html" import render_form %}{% block admin_title %}Nov uporabnik{% endblock %}{% block admin_content %}<div class="admin-heading"><div><h1>Nov uporabnik</h1><p>Uporabniku varno posredujte začasno geslo in priporočite takojšnjo menjavo.</p></div><a class="button button-secondary" href="{{ url_for('admin.users') }}">Nazaj</a></div><div class="card panel">{{ render_form(form) }}</div>{% endblock %}
+{% extends "admin/base.html" %}
+{% from "admin/users/_role_cards.html" import role_cards %}
+{% block admin_title %}Nov uporabnik{% endblock %}
+{% block admin_content %}
+<div class="admin-heading user-create-heading">
+  <div>
+    <h1>Nov uporabnik</h1>
+    <p>Vnesite začetno geslo. Uporabniku lahko pozneje pošljete varno povezavo za spremembo gesla.</p>
+  </div>
+  <a class="button button-secondary" href="{{ url_for('admin.users') }}">Nazaj</a>
+</div>
 
+<div class="card panel user-create-card">
+  <form method="post" class="form-stack user-create-form">
+    {{ form.hidden_tag() }}
+    <div class="user-create-fields">
+      {% for item in (form.email, form.username) %}
+        <div class="form-field{% if item.errors %} has-error{% endif %}">
+          {{ item.label }}
+          {{ item(class_='input') }}
+          {% if item.description %}<small>{{ item.description }}</small>{% endif %}
+          {% for error in item.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+        </div>
+      {% endfor %}
+      <div class="form-field user-password-field{% if form.password.errors %} has-error{% endif %}">
+        {{ form.password.label }}
+        {{ form.password(class_='input') }}
+        {% if form.password.description %}<small>{{ form.password.description }}</small>{% endif %}
+        {% for error in form.password.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+      </div>
+    </div>
+
+    {{ role_cards(form.roles) }}
+
+    {{ form.submit(class_='button user-create-submit') }}
+  </form>
+</div>
+{% endblock %}

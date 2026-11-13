@@ -1,9 +1,7 @@
-import smtplib
 from datetime import datetime, timezone
-from email.message import EmailMessage
 from urllib.parse import urljoin, urlparse
 
-from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
+from flask import Blueprint, flash, make_response, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 from sqlalchemy import or_
 
@@ -11,6 +9,7 @@ from ..extensions import db, limiter
 from ..forms import ForgotPasswordForm, LoginForm, ResetPasswordForm
 from ..models import User
 from ..services.audit import record
+from ..services.email import send_password_reset_email
 
 
 bp = Blueprint("auth", __name__)
@@ -61,30 +60,10 @@ def forgot_password():
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.email.data.strip().lower()).first()
         if user and user.is_active:
-            _send_reset_email(user)
+            send_password_reset_email(user)
         flash("Če račun obstaja, smo poslali navodila za ponastavitev gesla.", "success")
         return redirect(url_for("auth.login"))
     return render_template("auth/forgot_password.html", form=form)
-
-
-def _send_reset_email(user):
-    server = current_app.config.get("MAIL_SERVER")
-    if not server:
-        current_app.logger.warning("Password reset requested but SMTP is not configured for user_id=%s", user.id)
-        return
-    reset_url = url_for("auth.reset_password", token=user.get_reset_token(), _external=True)
-    message = EmailMessage()
-    message["Subject"] = "Ponastavitev gesla — TK Gornja Radgona"
-    message["From"] = current_app.config["MAIL_DEFAULT_SENDER"]
-    message["To"] = user.email
-    message.set_content(f"Geslo lahko v eni uri ponastavite na naslovu:\n\n{reset_url}\n")
-    with smtplib.SMTP(server, current_app.config["MAIL_PORT"], timeout=15) as smtp:
-        if current_app.config["MAIL_USE_TLS"]:
-            smtp.starttls()
-        if current_app.config["MAIL_USERNAME"]:
-            smtp.login(current_app.config["MAIL_USERNAME"], current_app.config["MAIL_PASSWORD"])
-        smtp.send_message(message)
-
 
 @bp.route("/novo-geslo/<token>", methods=["GET", "POST"])
 @limiter.limit("5 per hour", methods=["POST"])
@@ -100,7 +79,10 @@ def reset_password(token):
         db.session.commit()
         flash("Geslo je bilo spremenjeno. Zdaj se lahko prijavite.", "success")
         return redirect(url_for("auth.login"))
-    return render_template("auth/reset_password.html", form=form)
+    response = make_response(render_template("auth/reset_password.html", form=form))
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return response
 
 
 @bp.get("/profil")

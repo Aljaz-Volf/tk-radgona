@@ -23,11 +23,19 @@
             <div class="league-season-period">{{ item.starts_on.strftime('%d. %m. %Y') }}–{{ item.ends_on.strftime('%d. %m. %Y') }}</div>
             <div class="league-group-chips">
               {% for group_row in row.groups %}
-                {% if row.is_past %}
-                  <span>{{ group_row.group.name }} · {{ group_row.player_count }}</span>
-                {% else %}
-                  <a href="{{ url_for('admin.group_form', group_id=group_row.group.id) }}">{{ group_row.group.name }} · {{ group_row.player_count }}</a>
-                {% endif %}
+                <div class="league-group-control">
+                  {% if row.is_past %}
+                    <span class="league-group-label">{{ group_row.group.name }} · {{ group_row.player_count }}</span>
+                  {% else %}
+                    <a href="{{ url_for('admin.group_form', group_id=group_row.group.id) }}">{{ group_row.group.name }} · {{ group_row.player_count }}</a>
+                  {% endif %}
+                  {% if current_user.has_any_role('owner', 'superadmin') %}
+                    <form method="post" action="{{ url_for('admin.group_delete', group_id=group_row.group.id) }}" data-confirm="Izbrišem ligo {{ group_row.group.name }}? Izbrisani bodo tudi razvrstitev, tekme in rezultati te lige.">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button class="league-group-delete" type="submit" aria-label="Izbriši ligo {{ group_row.group.name }}" title="Izbriši ligo">×</button>
+                    </form>
+                  {% endif %}
+                </div>
               {% else %}<em>Lig še ni</em>{% endfor %}
             </div>
             <div class="league-season-status">{{ 'V pripravi' if item.setup_pending else 'Objavljena' if item.is_published else 'Skrita' }}</div>

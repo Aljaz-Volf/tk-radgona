@@ -9,6 +9,7 @@ from wtforms import (
     HiddenField,
     IntegerField,
     PasswordField,
+    RadioField,
     SelectField,
     SelectMultipleField,
     StringField,
@@ -16,13 +17,14 @@ from wtforms import (
     TextAreaField,
     TimeField,
 )
-from wtforms.validators import DataRequired, Email, EqualTo, InputRequired, Length, NumberRange, Optional, ValidationError
+from wtforms.validators import DataRequired, Email, EqualTo, InputRequired, Length, NumberRange, Optional, Regexp, ValidationError
 
 from .models import PASSWORD_MIN_LENGTH
 
 
 IMAGE_TYPES = ["jpg", "jpeg", "png", "webp"]
 ROLE_CHOICES = [
+    ("owner", "Lastnik"),
     ("superadmin", "Superadministrator"),
     ("administrator", "Administrator"),
     ("member_news", "Urednik novic in galerij"),
@@ -310,12 +312,34 @@ class UserRoleForm(FlaskForm):
 
 
 class UserCreateForm(FlaskForm):
-    email = StringField("E-pošta", validators=[DataRequired(), Email(), Length(max=254)])
-    username = StringField("Uporabniško ime", validators=[DataRequired(), Length(min=3, max=80)])
-    password = PasswordField(
-        "Začasno geslo", validators=[DataRequired(), Length(min=PASSWORD_MIN_LENGTH, max=256)]
+    email = StringField(
+        "E-pošta",
+        filters=[lambda value: value.strip().lower() if value else value],
+        validators=[DataRequired(), Email(), Length(max=254)],
+        description="Mora biti edinstvena.",
+        render_kw={"placeholder": "ime@primer.si", "autocomplete": "email"},
     )
-    roles = SelectMultipleField("Vloge", choices=ROLE_CHOICES, validators=[DataRequired()])
+    username = StringField(
+        "Uporabniško ime",
+        filters=[lambda value: value.strip().lower() if value else value],
+        validators=[
+            DataRequired(),
+            Length(min=3, max=32),
+            Regexp(
+                r"^[a-zA-Z0-9._-]+$",
+                message="Dovoljene so črke, številke, pika, vezaj in podčrtaj.",
+            ),
+        ],
+        description="Mora biti edinstveno. Shranjeno bo z malimi črkami.",
+        render_kw={"placeholder": "npr. janez.novak", "autocomplete": "username"},
+    )
+    password = PasswordField(
+        "Začetno geslo",
+        validators=[DataRequired(), Length(min=PASSWORD_MIN_LENGTH, max=256)],
+        description="Najmanj 6 znakov. Uporabnik ga lahko pozneje spremeni prek povezave, poslane po e-pošti.",
+        render_kw={"placeholder": "Najmanj 6 znakov", "autocomplete": "new-password"},
+    )
+    roles = RadioField("Vloga", choices=ROLE_CHOICES, validators=[DataRequired()], default="member")
     submit = SubmitField("Ustvari račun")
 
 

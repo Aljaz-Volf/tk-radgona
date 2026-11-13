@@ -1,2 +1,25 @@
-{% extends "admin/base.html" %}{% from "macros/forms.html" import render_form %}{% block admin_title %}Dostop{% endblock %}{% block admin_content %}<div class="admin-heading"><div><h1>Dostop uporabnika</h1><p>{{ user.username }} · {{ user.email }}</p></div><a class="button button-secondary" href="{{ url_for('admin.users') }}">Nazaj</a></div><div class="card panel">{{ render_form(form) }}</div>{% endblock %}
+{% extends "admin/base.html" %}
+{% from "admin/users/_role_cards.html" import role_cards %}
+{% block admin_title %}Dostop{% endblock %}
+{% block admin_content %}
+<div class="admin-heading user-create-heading">
+  <div>
+    <h1>Dostop uporabnika</h1>
+    <p>{{ user.username }} · {{ user.email }}</p>
+  </div>
+  <a class="button button-secondary" href="{{ url_for('admin.users') }}">Nazaj</a>
+</div>
 
+<div class="card panel user-create-card">
+  <form method="post" class="form-stack user-create-form">
+    {{ form.hidden_tag() }}
+    {{ role_cards(form.roles) }}
+    <label class="check-field">
+      {{ form.active() }}
+      <span>{{ form.active.label.text }}</span>
+    </label>
+    {% for error in form.active.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+    {{ form.submit(class_='button user-create-submit') }}
+  </form>
+</div>
+{% endblock %}

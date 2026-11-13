@@ -1,0 +1,24 @@
+{% macro role_cards(field) %}
+  <fieldset class="role-picker">
+    <legend>{{ field.label.text }}</legend>
+    <div class="role-card-grid">
+      {% set role_details = {
+        'owner': ('★', 'Najvišji dostop. Samo lastnik lahko dodeli ali odvzame vlogo lastnika.'),
+        'superadmin': ('◈', 'Poln dostop do vsega, vključno z upravljanjem administratorjev.'),
+        'administrator': ('☼', 'Upravlja uporabnike, vsebine in nastavitve strani brez pregleda.'),
+        'member_news': ('✎', 'Objavlja novice in ustvarja galerije brez dostopa do uporabnikov.'),
+        'member': ('○', 'Osnovni dostop do članskega imenika in galerije.')
+      } %}
+      {% for option in field %}
+        {% set details = role_details[option.data] %}
+        <label class="role-card" for="{{ option.id }}">
+          {{ option(class_='role-card-input') }}
+          <span class="role-card-icon" aria-hidden="true">{{ details[0] }}</span>
+          <span class="role-card-copy"><strong>{{ option.label.text }}</strong><small>{{ details[1] }}</small></span>
+          <span class="role-card-radio" aria-hidden="true"></span>
+        </label>
+      {% endfor %}
+    </div>
+    {% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+  </fieldset>
+{% endmacro %}

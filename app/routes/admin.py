@@ -3,9 +3,10 @@ from datetime import date, datetime, time, timedelta, timezone
 
 from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 
-from ..extensions import db
+from ..extensions import db, limiter
 from ..forms import (
     ClubContentForm,
     CommitteeForm,
@@ -46,10 +47,12 @@ from ..models import (
     Role,
     Season,
     SiteSetting,
+    Standing,
     User,
 )
 from ..services.audit import record
 from ..services.content import sanitize_rich_text, unique_slug
+from ..services.email import send_password_reset_email
 from ..services.fixtures import Fixture, Round, generate_round_robin, validate_round_robin
 from ..services.scoring import parse_score
 from ..services.standings import (
@@ -71,7 +74,7 @@ CONTENT_CONTRIBUTOR_ENDPOINTS = {"admin.news_create", "admin.gallery_form"}
 
 def _is_content_contributor_only():
     return current_user.has_any_role("member_news") and not current_user.has_any_role(
-        "superadmin", "administrator"
+        "owner", "superadmin", "administrator"
     )
 
 
@@ -80,11 +83,46 @@ def _content_return_url(admin_endpoint, public_endpoint):
     return url_for(endpoint)
 
 
+def _assignable_role_choices():
+    if current_user.has_any_role("owner"):
+        return ROLE_CHOICES
+    if current_user.has_any_role("superadmin"):
+        return [choice for choice in ROLE_CHOICES if choice[0] != "owner"]
+    return [choice for choice in ROLE_CHOICES if choice[0] in {"member_news", "member"}]
+
+
+def _can_manage_user(user):
+    if current_user.has_any_role("owner"):
+        return True
+    if current_user.has_any_role("superadmin"):
+        return not user.has_any_role("owner")
+    if current_user.has_any_role("administrator"):
+        return not user.has_any_role("owner", "superadmin", "administrator")
+    return False
+
+
+def _required_self_role():
+    for role_name in ("owner", "superadmin", "administrator"):
+        if current_user.has_any_role(role_name):
+            return role_name
+    return None
+
+
+def _add_user_conflict_errors(form, email, username):
+    email_exists = User.query.filter(func.lower(User.email) == email).first() is not None
+    username_exists = User.query.filter(func.lower(User.username) == username).first() is not None
+    if email_exists:
+        form.email.errors.append("Ta e-pošta je že v uporabi.")
+    if username_exists:
+        form.username.errors.append("To uporabniško ime je že zasedeno.")
+    return email_exists or username_exists
+
+
 @bp.before_request
 def require_admin():
     if not current_user.is_authenticated:
         return redirect(url_for("auth.login", next=request.full_path))
-    if current_user.has_any_role("superadmin"):
+    if current_user.has_any_role("owner", "superadmin"):
         return None
     if current_user.has_any_role("administrator"):
         if request.endpoint == "admin.dashboard":
@@ -552,6 +590,40 @@ def group_form(season_id=None, group_id=None):
         flash("Liga je shranjena.", "success")
         return redirect(url_for("admin.season_players", season_id=season.id))
     return render_template("admin/league/group_form.html", form=form, group=group, season=season)
+
+
+@bp.post("/liga/skupina/<int:group_id>/izbrisi")
+def group_delete(group_id):
+    if not current_user.has_any_role("owner", "superadmin"):
+        abort(403)
+
+    group = db.get_or_404(LeagueGroup, group_id)
+    group_name = group.name
+    match_ids = [match.id for match in group.matches]
+    record(
+        "league_group.delete",
+        group,
+        {
+            "name": group_name,
+            "season_id": group.season_id,
+            "players": len(group.memberships),
+            "matches": len(match_ids),
+        },
+    )
+    if match_ids:
+        MatchSet.query.filter(MatchSet.match_id.in_(match_ids)).delete(
+            synchronize_session=False
+        )
+        Match.query.filter(Match.id.in_(match_ids)).delete(synchronize_session=False)
+    Standing.query.filter_by(group_id=group.id).delete(synchronize_session=False)
+    LeagueMembership.query.filter_by(group_id=group.id).delete(synchronize_session=False)
+    LeagueGroup.query.filter_by(source_group_id=group.id).update(
+        {LeagueGroup.source_group_id: None}, synchronize_session=False
+    )
+    LeagueGroup.query.filter_by(id=group.id).delete(synchronize_session=False)
+    db.session.commit()
+    flash(f"Liga {group_name} je izbrisana.", "success")
+    return redirect(url_for("admin.seasons"))
 
 
 def _ordered_group_player_ids(group):
@@ -1791,47 +1863,54 @@ def committee_member_delete(member_id):
 
 @bp.get("/uporabniki")
 def users():
-    return render_template("admin/users/index.html", users=User.query.order_by(User.username).all())
+    return render_template(
+        "admin/users/index.html",
+        users=User.query.order_by(User.username).all(),
+        can_manage_user=_can_manage_user,
+    )
 
 
 @bp.route("/uporabniki/nov", methods=["GET", "POST"])
 def user_create():
     form = UserCreateForm()
-    if not current_user.has_any_role("superadmin"):
-        form.roles.choices = [choice for choice in ROLE_CHOICES if choice[0] != "superadmin"]
+    form.roles.choices = _assignable_role_choices()
     if form.validate_on_submit():
         email = form.email.data.strip().lower()
-        username = form.username.data.strip()
-        if User.query.filter((User.email == email) | (User.username == username)).first():
-            form.email.errors.append("Uporabnik s tem naslovom ali uporabniškim imenom že obstaja.")
+        username = form.username.data.strip().lower()
+        if _add_user_conflict_errors(form, email, username):
+            pass
         else:
-            roles = Role.query.filter(Role.name.in_(form.roles.data)).all()
-            user = User(email=email, username=username, roles=roles)
+            role = Role.query.filter_by(name=form.roles.data).one()
+            user = User(email=email, username=username, roles=[role])
             user.set_password(form.password.data)
             db.session.add(user)
-            db.session.flush()
-            record("user.create", user, {"roles": form.roles.data})
-            db.session.commit()
-            flash("Uporabniški račun je ustvarjen.", "success")
-            return redirect(url_for("admin.users"))
+            try:
+                db.session.flush()
+                record("user.create", user, {"roles": [form.roles.data]})
+                db.session.commit()
+            except IntegrityError:
+                db.session.rollback()
+                if not _add_user_conflict_errors(form, email, username):
+                    form.email.errors.append("Računa ni bilo mogoče ustvariti. Poskusite znova.")
+            else:
+                flash("Uporabniški račun je ustvarjen.", "success")
+                return redirect(url_for("admin.users"))
     return render_template("admin/users/create_form.html", form=form)
 
 
 @bp.route("/uporabniki/<int:user_id>/dostop", methods=["GET", "POST"])
 def user_access(user_id):
     user = db.get_or_404(User, user_id)
-    is_superadmin = current_user.has_any_role("superadmin")
-    if user.has_any_role("superadmin") and not is_superadmin:
+    if not _can_manage_user(user):
         abort(403)
     form = UserRoleForm()
-    if not is_superadmin:
-        form.roles.choices = [choice for choice in ROLE_CHOICES if choice[0] != "superadmin"]
+    form.roles.choices = _assignable_role_choices()
     if request.method == "GET":
         form.roles.data = [role.name for role in user.roles]
         form.active.data = user.is_active
     if form.validate_on_submit():
         roles = Role.query.filter(Role.name.in_(form.roles.data)).all()
-        required_self_role = "superadmin" if is_superadmin else "administrator"
+        required_self_role = _required_self_role()
         if user.id == current_user.id and (not form.active.data or required_self_role not in form.roles.data):
             form.roles.errors.append("Svojemu računu ne morete odvzeti skrbniškega dostopa.")
         else:
@@ -1842,6 +1921,23 @@ def user_access(user_id):
             flash("Dostop je posodobljen.", "success")
             return redirect(url_for("admin.users"))
     return render_template("admin/users/access_form.html", form=form, user=user)
+
+
+@bp.post("/uporabniki/<int:user_id>/mail")
+@limiter.limit("5 per hour")
+def user_password_mail(user_id):
+    user = db.get_or_404(User, user_id)
+    if not _can_manage_user(user):
+        abort(403)
+
+    sent = send_password_reset_email(user)
+    record("user.password_reset_email", user, {"sent": sent})
+    db.session.commit()
+    if sent:
+        flash(f"Povezava za spremembo gesla je bila poslana uporabniku {user.username}.", "success")
+    else:
+        flash("E-pošte ni bilo mogoče poslati. Preverite nastavitve SMTP.", "error")
+    return redirect(url_for("admin.users"))
 
 
 @bp.route("/nastavitve", methods=["GET", "POST"])

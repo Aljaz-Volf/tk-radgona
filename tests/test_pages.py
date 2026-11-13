@@ -15,6 +15,12 @@ def test_homepage_renders_without_seed_data(client):
     assert "Novice še niso objavljene" in text
     assert ">Galerija<" not in text
     assert 'id="galerije"' not in text
+    assert "Copyright ©" in text
+
+
+def test_homepage_footer_touches_call_to_action(client):
+    stylesheet = client.get("/static/css/main.css").get_data(as_text=True)
+    assert ".home-original .site-footer { margin-top: 0; }" in stylesheet
 
 
 def test_health_endpoint(client):
@@ -138,6 +144,39 @@ def test_admin_index_and_management_pages_render(client, admin):
     for url in urls:
         response = client.get(url)
         assert response.status_code == 200, url
+
+
+def test_create_user_page_has_password_and_role_cards(client, admin):
+    login(client)
+    page = client.get("/admin/uporabniki/nov").get_data(as_text=True)
+    assert 'name="password"' in page
+    assert 'class="role-card"' in page
+    assert "Superadministrator" in page
+    assert "Urednik novic in galerij" in page
+    assert "Lastnik" not in page
+
+
+def test_user_list_has_mail_action(client, admin, member):
+    login(client)
+    page = client.get("/admin/uporabniki").get_data(as_text=True)
+    assert f'action="/admin/uporabniki/{member}/mail"' in page
+    assert ">Mail<" in page
+
+
+def test_user_access_page_uses_role_cards(client, admin, member):
+    login(client)
+    page = client.get(f"/admin/uporabniki/{member}/dostop").get_data(as_text=True)
+    assert page.count('class="role-card"') == 4
+    assert "Superadministrator" in page
+    assert "Urednik novic in galerij" in page
+    assert 'name="active"' in page
+
+
+def test_owner_sees_owner_role_card(client, owner):
+    login(client, "owner")
+    page = client.get("/admin/uporabniki/nov").get_data(as_text=True)
+    assert page.count('class="role-card"') == 5
+    assert "Lastnik" in page
 
 
 def test_member_can_be_added_to_and_removed_from_active_players(app, client, admin):

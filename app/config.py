@@ -60,6 +60,7 @@ class Config:
     MAIL_USERNAME = os.getenv("MAIL_USERNAME")
     MAIL_PASSWORD = os.getenv("MAIL_PASSWORD")
     MAIL_DEFAULT_SENDER = os.getenv("MAIL_DEFAULT_SENDER")
+    PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "http://127.0.0.1:5000")
     COURTIPLAY_URL = os.getenv("COURTIPLAY_URL", "https://courtiplay.com")
     APP_TIMEZONE = os.getenv("APP_TIMEZONE", "Europe/Ljubljana")
 

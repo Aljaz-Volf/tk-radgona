@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% set content_contributor_only = current_user.has_any_role('member_news') and not current_user.has_any_role('superadmin', 'administrator') %}
+{% set content_contributor_only = current_user.has_any_role('member_news') and not current_user.has_any_role('owner', 'superadmin', 'administrator') %}
 {% block title %}{% block admin_title %}Administracija{% endblock %}{% if not content_contributor_only %} | Administracija{% endif %} | TK Gornja Radgona{% endblock %}
 {% block body_class %}admin-body{% endblock %}
 {% block content %}
@@ -7,7 +7,7 @@
   {% if not content_contributor_only %}
   <aside class="admin-sidebar"><strong>Upravljanje</strong><nav>
     {% set items = [('admin.news','Novice'),('admin.seasons','Liga'),('admin.matches','Tekme'),('admin.players','Igralci'),('admin.courts','Igrišča'),('admin.members','Člani'),('admin.galleries','Galerije'),('admin.committees','Organi kluba'),('admin.content','Vsebina kluba'),('admin.users','Uporabniki'),('admin.settings','Nastavitve')] %}
-    {% if current_user.has_any_role('superadmin') %}<a class="{{ 'active' if request.endpoint == 'admin.dashboard' else '' }}" href="{{ url_for('admin.dashboard') }}">Pregled</a>{% endif %}
+    {% if current_user.has_any_role('owner', 'superadmin') %}<a class="{{ 'active' if request.endpoint == 'admin.dashboard' else '' }}" href="{{ url_for('admin.dashboard') }}">Pregled</a>{% endif %}
     {% for endpoint, label in items %}<a class="{{ 'active' if request.endpoint == endpoint else '' }}" href="{{ url_for(endpoint) }}">{{ label }}</a>{% endfor %}
   </nav></aside>
   {% endif %}

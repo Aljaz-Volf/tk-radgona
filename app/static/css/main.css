@@ -259,6 +259,28 @@ select.input[multiple] { min-height: 160px; }
 .actions form { margin: 0; }
 .table-link { color: var(--clay); font-weight: 700; }
 
+.user-create-heading, .user-create-card { width: min(100%, 1100px); margin-inline: auto; }
+.user-create-card { padding: 32px; }
+.user-create-form { margin-top: 0; gap: 28px; }
+.user-create-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+.user-create-fields .form-field > small { order: 3; }
+.user-password-field { grid-column: 1 / -1; }
+.role-picker { margin: 0; padding: 0; border: 0; }
+.role-picker > legend { margin-bottom: 12px; font-size: 13px; font-weight: 800; }
+.role-card-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.role-card { position: relative; min-height: 116px; padding: 17px 48px 17px 16px; display: grid; grid-template-columns: 42px minmax(0, 1fr); align-items: start; gap: 12px; border: 1.5px solid var(--line); border-radius: 15px; background: var(--paper); cursor: pointer; transition: border-color .16s ease, background .16s ease, box-shadow .16s ease; }
+.role-card:hover { border-color: color-mix(in srgb, var(--clay) 65%, var(--line)); }
+.role-card:has(.role-card-input:focus-visible) { box-shadow: 0 0 0 3px color-mix(in srgb, var(--clay) 18%, transparent); }
+.role-card:has(.role-card-input:checked) { border-color: var(--clay); background: color-mix(in srgb, var(--clay) 9%, var(--paper)); }
+.role-card-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.role-card-icon { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 11px; background: var(--surface-2); color: var(--ink); font-size: 22px; font-weight: 800; }
+.role-card-copy { min-width: 0; display: grid; gap: 4px; }
+.role-card-copy strong { font-size: 15px; }
+.role-card-copy small { color: var(--muted); font-size: 12px; line-height: 1.45; }
+.role-card-radio { position: absolute; top: 17px; right: 17px; width: 20px; height: 20px; border: 2px solid var(--muted); border-radius: 50%; }
+.role-card:has(.role-card-input:checked) .role-card-radio { border: 6px solid var(--clay); }
+.user-create-submit { width: 100%; }
+
 .match-result-heading { width: min(100%, 980px); margin-inline: auto; }
 .match-result-card { width: min(100%, 980px); margin-inline: auto; padding: 30px; }
 .match-result-card-heading { margin-bottom: 18px; display: flex; align-items: center; justify-content: space-between; gap: 20px; color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
@@ -347,8 +369,12 @@ select.input[multiple] { min-height: 160px; }
 .league-state-chip.is-current { border: 0; background: var(--ball); color: #2b3300; }
 .league-season-period, .league-season-status { font-size: 12px; font-weight: 600; }
 .league-group-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.league-group-chips a, .league-group-chips span { padding: 4px 9px; border-radius: 999px; background: var(--surface-2); color: var(--ink); font-size: 10px; font-weight: 800; text-decoration: none; }
-.league-group-chips a:hover { background: var(--clay-pale); color: var(--clay); }
+.league-group-control { display: inline-flex; align-items: center; overflow: hidden; border-radius: 999px; background: var(--surface-2); }
+.league-group-control > a, .league-group-control > .league-group-label { padding: 4px 9px; color: var(--ink); font-size: 10px; font-weight: 800; text-decoration: none; }
+.league-group-control > a:hover { background: var(--clay-pale); color: var(--clay); }
+.league-group-control form { margin: 0; align-self: stretch; display: flex; }
+.league-group-delete { width: 24px; padding: 0 5px 1px; border: 0; border-left: 1px solid var(--line); background: transparent; color: var(--danger); cursor: pointer; font-size: 16px; font-weight: 800; }
+.league-group-delete:hover, .league-group-delete:focus-visible { background: var(--danger); color: #fff; }
 .league-group-chips em { color: var(--muted); font-size: 12px; }
 .league-season-actions { justify-self: end; }
 .league-season-toolbar { margin-top: 12px; padding: 11px 13px; display: flex; align-items: center; justify-content: space-between; gap: 18px; border-radius: 11px; background: var(--surface-2); }
@@ -727,6 +753,7 @@ a.home-tile:hover { transform: translateY(-4px); box-shadow: 0 16px 36px rgba(60
 .home-cta .cta-inner { min-height: 0; padding-block: 76px; }
 
 .site-footer { margin-top: 100px; padding: 56px 0 26px; border-top: 1px solid var(--line); background: var(--surface); }
+.home-original .site-footer { margin-top: 0; }
 .footer-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 40px; }
 .footer-grid > div { display: grid; align-content: start; gap: 8px; }
 .footer-grid a:not(.brand) { color: var(--muted); font-size: 14px; text-decoration: none; }
@@ -755,6 +782,7 @@ a.home-tile:hover { transform: translateY(-4px); box-shadow: 0 16px 36px rgba(60
   .site-nav { position: absolute; top: 72px; left: 0; right: 0; padding: 12px 20px 20px; display: none; align-items: stretch; flex-direction: column; border-bottom: 1px solid var(--line); background: var(--paper); box-shadow: var(--shadow); }
   .site-nav.is-open { display: flex; }
   .site-nav > a, .nav-button { width: 100%; text-align: left; }
+  .role-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .nav-dropdown { width: 100%; }
   .nav-dropdown summary { width: 100%; }
   .nav-dropdown-menu { position: static; width: 100%; margin-top: 4px; border: 0; border-radius: 10px; background: var(--surface-2); box-shadow: none; transform: none; }
@@ -808,6 +836,9 @@ a.home-tile:hover { transform: translateY(-4px); box-shadow: 0 16px 36px rgba(60
   .footer-grid > div:first-child { grid-column: 1 / -1; }
   .footer-bottom { flex-direction: column; }
   .form-grid { grid-template-columns: 1fr; }
+  .user-create-card { padding: 20px 14px; }
+  .user-create-fields, .role-card-grid { grid-template-columns: 1fr; }
+  .user-password-field { grid-column: auto; }
   .news-editor-meta { grid-template-columns: 1fr; }
   .admin-main { padding: 28px 14px; }
   .admin-heading { align-items: flex-start; flex-direction: column; }
